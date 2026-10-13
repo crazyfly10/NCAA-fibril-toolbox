@@ -1,0 +1,99 @@
+# The protocol's own system, as a toolbox config: an 11-chain HET-s(218-289) fibril with a poison cap docked on one
+# end, and Cys-maleimide-PEG12-biotin as the residue CYL at A239 and L130.
+#
+# The capped fibril itself (protocol steps 1-6) is designed by hand in PyMOL and AlphaFold: see fibril_design/.
+# The toolbox starts from its result, fibril_design/hets11_capped.pdb.
+#
+#   cd examples/hets_cyl
+#   python -m fibriltoolbox ncaa-param ncaa-relax fibril-prepare fibril-run config.toml
+#   python -m fibriltoolbox linked-build linked-run linked-analyse config.toml      # Run 1
+#   python -m fibriltoolbox free-build free-run free-analyse config.toml           # Run 2
+#
+# Every value below is the one the study used. Paths are relative to this file.
+
+[project]
+workdir = "work"                     # each stage writes into its own folder under this one
+
+[tools]
+gmx = "gmx_mpi"                      # GROMACS 2026.3 or newer (ships ff19SB as amber19sb.ff)
+pymol = "pymol"                      # used headless (pymol -cq) by linked-build
+mdrun_flags = "-nb gpu -pme gpu"
+
+# ---------------------------------------------------------------- the residue (protocol steps 10-17)
+[ncaa]
+name = "CYL"                         # three characters, not an existing residue name
+mol2 = "inputs/12EO_linker.mol2"    # drawn capped: ACE-X-NME
+net_charge = 0
+parent = "CYX"                       # the canonical residue it derives from: gives the ff19SB names, types, charges
+parent_atoms = ["CB", "SG"]          # side-chain atoms shared with the parent (default: as many as match)
+
+[ncaa.relax]                         # the capped residue alone in water
+box = 12.0                           # A, truncated octahedron
+ion_pairs = 26
+production_ns = 1.0
+graft_frame_ps = 1000                # the conformation grafted onto the fibril
+frames_ps = [250, 500, 750, 1000]    # the conformations scattered in the free-linker run
+
+# A note on the checks, for [ncaa.relax], [relax], [linked] and [free]. After minimisation, NVT and NPT the stage applies
+# the protocol's criteria (check_em.py, check_nvt.py, check_npt.py). If all pass it goes on by itself; if one fails it
+# stops before the next run and says what failed. Two settings change that:
+#   accept = ["npt"]             go on although that step's checks failed ("em", "nvt", "npt"): you have looked at it
+#   stop_before = "production"   always stop before production, to look at the equilibration first
+
+# A note on the box, for [relax] box_d, [linked] box and [free] box. Left out, each is worked out from the structure:
+# that probably removes periodic-image artefacts but makes the system larger and the run slower (the stage prints an
+# estimate). A small fixed margin such as 12 A lets a flexible region near the box edge reach its own periodic image.
+# The numbers below are the study's, kept so that this example reproduces it.
+
+# ---------------------------------------------------------------- the fibril in water (steps 7-9; optional)
+[relax]
+structure = "fibril_design/hets11_capped.pdb"    # the protein-only starting structure: here the result of steps 1-6
+box_d = 1.2                          # nm between the fibril and the box edge: the study's value. Leave the line out (or "auto") and
+                                     # the box is worked out: the fibril's extent plus image_margin_nm (3.0), with any tail listed as
+                                     # flexible = [{chain = "L", anchor = 20, reach_nm = 2.5}] allowed to stretch that far
+salt = 0.15
+density_range = [1025, 1055]       # the study's range for its own box; leave the line out and it is worked out from what is in the box
+production_ns = 200
+restrain = {chains = ["G"], atoms = ["CA"], fc = 1000}
+hbond = [                            # interfaces compared in step 9: reference chain, target chain:residues
+  {name = "K-L", ref = "K", target = "L:8-73"},
+  {name = "H-I", ref = "H", target = "I:224-289"},
+  {name = "A-B", ref = "B", target = "A:224-289"},
+]
+
+[relax.stability]                    # the study's check of a capped HET-s rod; leave this table out for other fibrils
+script = "check_capped_stability_3.py"
+
+# ---------------------------------------------------------------- Run 1: the residue attached (steps 18-27)
+[attach]
+sites = [{chain = "A", resi = 239, label = "chain A"}, {chain = "L", resi = 130, label = "cap"}]
+
+[linked]
+# fibril = "my_relaxed_fibril.pdb"   # give this to skip fibril-prepare and fibril-run
+group = "Prot_cyl"                   # name of the solute's thermostat group
+box = 12.0                           # A, the study's value. Leave the line out (or "auto") and it is worked out from the reach of the
+                                     # residue; reach = "median" | "p95" | "max" | nm and image_margin_nm (2.0) adjust that
+salt = 0.15
+density_range = [1025, 1055]
+restrain = {chains = ["F", "G"], atoms = "N CA C O", fc = 200}
+production_ns = 200
+
+[linked.analysis]                    # linked_eq_check.py: written for CYL (cysteine, spacer, PEG, biotin)
+script = "linked_eq_check.py"
+
+# ---------------------------------------------------------------- Run 2: free capped residues (steps 28-35)
+[free]
+group = "Prot_cyl"
+n_linkers = 40
+insert_d = 1.5                       # nm around the fibril that insert-molecules fills
+accept = ["npt"]                     # the study's NPT ends with the solute about 3 K warm, which the protocol accepts
+box = 12.0                           # A, the study's value. Leave the line out (or "auto") and the fibril is kept one residue's reach
+                                     # plus image_margin_nm (2.0) from its own image
+density_range = [1005, 1030]
+restrain = {chains = ["F", "G"], atoms = "N CA C O", fc = 200}
+production_ns = 200
+
+[free.analysis]                      # free_linker_analysis.py: written for CYL
+script = "free_linker_analysis.py"
+every_ps = 10
+from_ns = 0
