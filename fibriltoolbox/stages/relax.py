@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .. import gmxmd
 from ..box import advice, atoms_in, auto_lengths, built
-from ..core import StageError, chain_breaks, nsteps_for, temp_changes, pdb_atoms, pdb_chains, resindex_ranges, stage, write_mdp
+from ..core import StageError, chain_breaks, nsteps_for, restraint_tag, temp_changes, pdb_atoms, pdb_chains, resindex_ranges, stage, write_mdp
 
 GROUPS = ["Protein", "Water_and_ions"]
 
@@ -20,8 +20,11 @@ def _structure(ctx):
     return p
 
 
-def _chain_posre(d, chain, atoms, fc):
-    """Position restraints for one chain, numbered inside its own moleculetype (pdb2gmx writes one .itp per chain)."""
+def _chain_posre(d, spec, atoms, fc):
+    """Position restraints for one chain, or a stretch of it ("G:226-282"), numbered inside its own moleculetype
+    (pdb2gmx writes one .itp per chain). Returns the chain's .itp, the restraint file's name and the atom count."""
+    chain, _, rng = str(spec).partition(":")
+    lo, hi = (int(x) for x in rng.split("-")) if rng else (None, None)
     itp = d / f"topol_Protein_chain_{chain}.itp"
     if not itp.exists():
         raise StageError(f"{itp.name} not found: pdb2gmx writes one per chain when the structure has several chains")
@@ -31,10 +34,14 @@ def _chain_posre(d, chain, atoms, fc):
         if s.startswith("["):
             sect = s.strip("[] ").lower()
         elif sect == "atoms" and s and not s.startswith(";") and s.split()[0].isdigit() and s.split()[4] in atoms:
-            idx.append(int(s.split()[0]))
-    (d / f"posre_{chain}.itp").write_text("[ position_restraints ]\n; atom  type      fx      fy      fz\n" +
-                                          "".join(f"{i:6d}     1  {fc:g}  {fc:g}  {fc:g}\n" for i in idx))
-    return itp, len(idx)
+            if lo is None or lo <= int(s.split()[2]) <= hi:
+                idx.append(int(s.split()[0]))
+    if not idx:
+        raise StageError(f"[relax] restrain: no atoms {sorted(atoms)} found for {spec} (chain {chain}" + (f", residues {lo}-{hi})" if rng else ")"))
+    name = f"posre_{restraint_tag([spec])}.itp"
+    (d / name).write_text("[ position_restraints ]\n; atom  type      fx      fy      fz\n" +
+                          "".join(f"{i:6d}     1  {fc:g}  {fc:g}  {fc:g}\n" for i in idx))
+    return itp, name, len(idx)
 
 
 def _aligned(gro, chains, flexible):
@@ -136,13 +143,13 @@ def fibril_run(ctx):
     ctx.pause(sec, "production")
     rs = c.get("restrain", {})
     chains = list(rs.get("chains", []))
-    tag = "".join(chains)
-    if ctx.begin("s7e", "7 · Production, with one interior chain held by its C-alpha atoms"):
+    tag = restraint_tag(chains)
+    if ctx.begin("s7e", "7 · Production, with the chosen chains (or stretches of them) held"):
         for ch in chains:
-            itp, k = _chain_posre(d, ch, set(rs.get("atoms", ["CA"])), float(rs.get("fc", 1000)))
+            itp, name, k = _chain_posre(d, ch, set(rs.get("atoms", ["CA"])), float(rs.get("fc", 1000)))
             with open(itp, "a") as f:
-                f.write(f'\n; added by fibriltoolbox: production restraint on this chain alone\n#ifdef POSRES_{tag}\n#include "posre_{ch}.itp"\n#endif\n')
-            ctx.note(f"posre_{ch}.itp: {k} atoms of chain {ch} at {float(rs.get('fc', 1000)):g} kJ/mol/nm2, behind POSRES_{tag}")
+                f.write(f'\n; added by fibriltoolbox: production restraint\n#ifdef POSRES_{tag}\n#include "{name}"\n#endif\n')
+            ctx.note(f"{name}: {k} atoms of {ch} at {float(rs.get('fc', 1000)):g} kJ/mol/nm2, behind POSRES_{tag}")
         ns = float(c.get("production_ns", 200))
         write_mdp("fibril_prod.mdp", d / "prod.mdp", {"nsteps": nsteps_for("fibril_prod.mdp", ns),
                                                      "define": f"-DPOSRES_{tag}" if chains else None,
@@ -151,7 +158,7 @@ def fibril_run(ctx):
         ctx.note(f"production: {ns:g} ns")
         ctx.end()
 
-    if ctx.begin("s8", "8 · Check the run: whole fibril, periodic image distance, stability"):
+    if ctx.begin("s8", "8 · Check the run: whole assembly, periodic image distance, stability"):
         ctx.sh(f"{ctx.gmx} trjconv -s prod.tpr -f prod.xtc -o cluster_prod.xtc -pbc cluster", stdin="Protein\nSystem\n", log="trjconv_cluster")
         ctx.sh(f"{ctx.gmx} trjconv -s prod.tpr -f cluster_prod.xtc -o nojump_prod.xtc -pbc nojump", stdin="System\n", log="trjconv_nojump")
         ctx.sh(f"{ctx.gmx} trjconv -s prod.tpr -f prod.cpt -o prod_so_far.gro", stdin="System\n", log="trjconv_gro")
@@ -164,15 +171,25 @@ def fibril_run(ctx):
         clean = gmxmd.image_clean_stretch(d / "mindist_pi.xvg")
         if clean:
             ctx.note(clean)
+        # the general check: did the assembly hold together and stop changing shape? Any protein, no settings needed
+        if c.get("assembly_check", True):
+            out = ctx.script("check_assembly_stability.py", ["prod_so_far.gro", "nojump_prod.xtc", str(c.get("image_check_dt_ps", 100))],
+                             {k2: c[k1] for k1, k2 in (("contacts_kept_min", "Q_MIN"), ("stability_window", "EQ_FRACTION")) if k1 in c})
+            (d / "assembly_stability.txt").write_text(out)
+            ctx.grab(out, re.compile(r"chains found|interfaces:|\[(PASS|FAIL)\]|held together|did not pass"))
+            gmxmd.draw(ctx, d, "plot_assembly_stability.py")
+        # a check of your own, written for your system (the worked example has one for its capped rod)
         if "stability" in c:
-            out = ctx.script(c["stability"].get("script", "check_capped_stability_3.py"),
-                             ["prod_so_far.gro", "nojump_prod.xtc", "prod.edr"], dict(c["stability"].get("settings", {})))
+            st = c["stability"]
+            own = lambda name: str(ctx.input(name)) if ctx.input(name).exists() else name      # beside the config, or in the package
+            out = ctx.script(own(st["script"]), ["prod_so_far.gro", "nojump_prod.xtc", "prod.edr"], dict(st.get("settings", {})))
             (d / "stability.txt").write_text(out)
-            gmxmd.draw(ctx, d, c["stability"].get("plot_script", "plot_capped_stability.py"))
             ctx.grab(out)
+            if "plot_script" in st:
+                gmxmd.draw(ctx, d, own(st["plot_script"]))
         ctx.end()
 
-    if ctx.begin("s9", "9 · Interface hydrogen bonds, and the relaxed fibril for the next stages"):
+    if ctx.begin("s9", "9 · The relaxed structure for the next stages" + (", and the hydrogen bonds asked for" if c.get("hbond") else "")):
         ch = pdb_chains(d / src.name)
         half = float(c.get("production_ns", 200)) * 500.0
         for hb in c.get("hbond", []):

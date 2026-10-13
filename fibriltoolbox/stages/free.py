@@ -35,11 +35,11 @@ def free_build(ctx):
         shutil.copy(d / "fibril_box.pdb", d / "start_0.pdb")
         for k, t in enumerate(frames, 1):
             shutil.copy(relax / f"lnk_{t}.pdb", d / f"lnk_{t}.pdb")
-            o = ctx.sh(f"{ctx.gmx} insert-molecules -f start_{k - 1}.pdb -ci lnk_{t}.pdb -nmol {per} -try 1000 -o start_{k}.pdb", log=f"insert_{t}")
+            o = ctx.sh(f"{ctx.gmx} insert-molecules -f start_{k - 1}.pdb -ci lnk_{t}.pdb -nmol {per} -try {int(F.get('insert_tries', 1000))} -o start_{k}.pdb", log=f"insert_{t}")
             m = re.search(r"Added (\d+) molecules \(out of (\d+) requested\)", o)
             ctx.note(f"frame {t} ps: " + (m.group(0) if m else "no 'Added' line in the output"))
             if not m or m.group(1) != m.group(2):
-                raise StageError(f"insert-molecules placed fewer than {per} molecules: enlarge [free] insert_d")
+                raise StageError(f"insert-molecules placed fewer than {per} molecules: enlarge [free] insert_d, or raise insert_tries")
         shutil.copy(d / f"start_{len(frames)}.pdb", d / "start.pdb")
         seq = ("ACE", name, "NME")
         o = ctx.script("split_linkers.py", ["fibril_box.pdb", "start.pdb", "linkers_noh.pdb"],
@@ -119,18 +119,31 @@ def free_run(ctx):
 
 @stage("free-analyse", "free", "35")
 def free_analyse(ctx):
-    """settling, exchange and contacts (free_linker_analysis.py; its atom groups describe a cysteine-linked PEG-biotin residue)"""
+    """has the free-molecule run settled, do the molecules exchange, which part makes the contacts (free_linker_analysis.py)"""
     F = ctx.cfg.get("free", {})
     A = F.get("analysis", {})
+    LA = ctx.cfg.get("linked", {}).get("analysis", {})          # the residue is the same one: share its description
+    name, _, _, desc = ncaa_info(ctx)
     out, group = F.get("name", "free"), F.get("group", "Solute")
     g = ctx.dir / f"{out}.amb2gmx"
-    if ctx.begin("s35", "35 · Analysis: has it settled, and do the linkers exchange?"):
+    if ctx.begin("s35", "35 · Analysis: has it settled, and do the free molecules exchange?"):
         ctx.sh(f"{ctx.gmx} trjconv -s prod.tpr -f prod.cpt -n index.ndx -o solute.gro", cwd=g, stdin=group + "\n", log="solute_gro")
         args = ["solute.gro", "prod.xtc", "--every", str(A.get("every_ps", 10))]
         if "from_ns" in A:
             args += ["--from", str(A["from_ns"])]
-        o = ctx.script(A.get("script", "free_linker_analysis.py"), args, cwd=g)
-        ctx.grab(o)
+        pick = lambda key, default=None: A.get(key, LA.get(key, default))
+        ov = dict(RESNAME=name, CORE=desc["backbone_names"] + desc["parent_side_names"],
+                  ANCHOR=pick("anchor", (desc["parent_side_names"] or ["CA"])[-1]), TIP=pick("tip"),
+                  NEAR_BONDS=int(pick("near_bonds", 7)), TIP_BONDS=int(pick("tip_bonds", 7)))
+        if "part_names" in A:
+            if len(A["part_names"]) != 4:
+                raise StageError("[free.analysis] part_names needs four names: backbone and caps, near the anchor, tip, the rest")
+            ov["PARTS"] = list(A["part_names"])
+        for key, const in (("contact_A", "CONTACT"), ("min_visit_ps", "MIN_VISIT_PS"), ("block_ps", "BLOCK_PS"), ("smooth_ns", "SMOOTH_NS")):
+            if key in A:
+                ov[const] = A[key]
+        o = ctx.script(A.get("script", "free_linker_analysis.py"), args, ov, cwd=g)
+        ctx.grab(o, re.compile(r"\[(PASS|FAIL|WARN|info)\]|^linker parts"))
         gmxmd.draw(ctx, g, A.get("plot_script", "plot_free_linker.py"), ["--separate"] if A.get("separate_figures") else [])
         ctx.note(f"full report: {g / 'free_linker_report.txt'}; figure: free_linker_overview.png; four CSV tables beside it")
         ctx.end()

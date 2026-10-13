@@ -42,6 +42,7 @@ class Ctx:
         self.pymol = t.get("pymol", "pymol")
         self.python = t.get("python", sys.executable)
         self.mdrun_flags = t.get("mdrun_flags", "-nb gpu -pme gpu")
+        self.mdrun_env = {str(k): str(v) for k, v in t.get("mdrun_env", {}).items()}     # e.g. GMX_MAXCONSTRWARN
         root = Path(cfg["project"].get("workdir", "."))
         self.root = root if root.is_absolute() else (cfg["_dir"] / root).resolve()
         self.stage = stage
@@ -259,6 +260,11 @@ def resindex_ranges(chains, spec):
             return start + idx[0], start + idx[-1]
         start += len(resids)
     raise StageError(f"no chain {ch!r} in the structure (chains: {''.join(c for c, _ in chains)})")
+
+
+def restraint_tag(specs):
+    """A name safe for file names, index groups and mdp defines: ['F', 'G'] -> 'FG', ['G:226-282'] -> 'G_226_282'."""
+    return "".join(re.sub(r"[^A-Za-z0-9]+", "_", str(x)) for x in specs)
 
 
 def chain_breaks(path, limit=4.2):

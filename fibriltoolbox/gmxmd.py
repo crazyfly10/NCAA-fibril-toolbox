@@ -60,9 +60,11 @@ def mdrun(ctx, d, deffnm, flags=None):
             out = d / f"{deffnm}_cont{k}.out"
             ctx.say(f"   {deffnm}: continuing from {deffnm}.cpt")
         with open(ctx.dir / "commands.log", "a") as f:
-            f.write(f"[{now()}] (cd {d})\n    nohup {' '.join(cmd)} > {out.name} 2>&1 &   # PID in {pidf.name}\n")
+            pre = "".join(f"{k}={v} " for k, v in ctx.mdrun_env.items())
+            f.write(f"[{now()}] (cd {d})\n    {pre}nohup {' '.join(cmd)} > {out.name} 2>&1 &   # PID in {pidf.name}\n")
         with open(out, "w") as fo:
-            p = subprocess.Popen(cmd, cwd=d, stdout=fo, stderr=subprocess.STDOUT, start_new_session=True)
+            p = subprocess.Popen(cmd, cwd=d, stdout=fo, stderr=subprocess.STDOUT, start_new_session=True,
+                                 env={**os.environ, **ctx.mdrun_env})
             pidf.write_text(f"{p.pid}\n")
             p.wait()
     if not finished(d, deffnm):

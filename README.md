@@ -107,14 +107,34 @@ Copy the example config and change:
 
 - `[ncaa]`: `mol2` (your molecule drawn with an acetyl cap on the N and an N-methyl cap on the C), `name`
   (three characters), `net_charge`, `parent` (the amino acid it derives from, as named in ff19SB: `CYX`, `LYS` …).
-- `[attach] sites`: chain and residue number of each attachment. After placing the residue, `linked-build` runs a
+- `[attach] sites`: chain and residue number of each attachment. **You choose these yourself.** The toolbox does not
+  look for attachment sites: open your structure in PyMOL (or another viewer), decide which residues the molecule
+  should replace, and give their chain letters and residue numbers as they appear in that file. Pick residues whose
+  side chains point into the solvent; measuring their solvent-accessible area first (as `sasa_cys.py` in the worked
+  example does) saves a failed build. The toolbox replaces whatever residue is at the position you give and does
+  not check its type, and a glycine cannot be a site because the fit needs a CB. After placing the residue, `linked-build` runs a
   clash test: a perfect backbone fit says nothing about whether the rest of the residue has room. If any of its
   heavy atoms lies within 1.5 Å of the protein at the best rotamer (`clash_within`: 1.5, 2.0 or 2.5), the stage stops
   and says the site is buried: choose an exposed residue or redesign the protein.
 - the starting structure, in one of two ways:
   - `[relax] structure = "construct.pdb"`: your protein-only model, which `fibril-prepare` solvates and `fibril-run` relaxes;
   - `[linked] fibril = "relaxed.pdb"` and `[free] fibril = "relaxed.pdb"`: an already relaxed one, skipping those two stages.
-- `restrain` in `[relax]`, `[linked]` and `[free]`: the interior chains held in production so the rod cannot turn.
+- **an N-terminal methionine, if you designed the protein from a deposited structure.** Structures from the PDB
+  often start with the methionine of the expression construct. Whether it is still there in your protein depends
+  on how it is made, so if you are not sure, you can keep it. Keeping it has one consequence here: production runs
+  use 4 fs steps with repartitioned hydrogen masses, and the S–CH₃ of a methionine at a flexible chain end can turn
+  far enough in one step to raise LINCS warnings; `gmx mdrun` stops after 1,000 of them. If your structure keeps
+  such a methionine, do one of two things:
+  - set `mdrun_env = {GMX_MAXCONSTRWARN = "-1"}` under `[tools]`. This lifts the limit, and it also silences every
+    other constraint warning, including one that would have mattered, so read the LINCS count each stage reports;
+  - or run at 2 fs without mass repartitioning: in `fibriltoolbox/mdp/`, set `dt = 0.002` and
+    `mass-repartition-factor = 1` in `fibril_prod.mdp`, `linked_prod.mdp`, `free_prod.mdp` and `free_npt.mdp`.
+    Runs then take about twice as long; the toolbox works the number of steps out from `dt`.
+
+  If the methionine is not in your construct, delete it from the structure before you start.
+- `restrain` in `[relax]`, `[linked]` and `[free]`: what is held in production so the assembly cannot turn in its
+  box. `chains` takes whole chains (`"G"`) or stretches of one (`"G:226-282"`, residue numbers as in your structure),
+  any number of them; `atoms` and `fc` set which atoms and how strongly. Leave `restrain` out to hold nothing.
 - the box, in every stage that makes one: worked out from the structure by default (`"auto"`), or your own number.
   - `[relax] box_d`: nm between the protein and the box edge. Automatic: the protein's extent plus
     `image_margin_nm` (3.0), with any segment listed in `flexible` allowed to stretch out by its `reach_nm`.
@@ -184,7 +204,7 @@ reports do not depend on it. A plotting script can be run again by hand in the f
 | `check_em.py` | `em.csv` | `plot_em.py` → `em.png` |
 | `check_nvt.py` | `nvt.csv`, `nvt_meta.json` | `plot_nvt.py` → `nvt.png` |
 | `check_npt.py` | `npt.csv`, `npt_meta.json` | `plot_npt.py` → `npt.png` |
-| `check_capped_stability_3.py` | `stability.csv`, `stability_rmsd.csv`, `stability_meta.json` | `plot_capped_stability.py` → `stability.png` |
+| `check_assembly_stability.py` | `assembly_stability.csv`, `assembly_stability_meta.json` | `plot_assembly_stability.py` → `assembly_stability.png` |
 | `linked_eq_check.py` | `linked_eq.csv`, `linked_eq_meta.json` | `plot_linked_eq.py` → `linked_eq.png` |
 | `free_linker_analysis.py` | four `free_linker_*.csv`, `free_linker_meta.json` | `plot_free_linker.py` → `free_linker_overview.png` |
 
@@ -210,9 +230,15 @@ outlives the terminal, and it can be stopped on its own with `kill $(cat prod.pi
 ### Limits of this version
 
 - The toolbox does not build the protein assembly: bring a protein-only PDB of it (see `examples/hets_cyl/fibril_design/` for how the example's was made).
-- `linked-analyse`, `free-analyse` and the stability check in `fibril-run` are written for the worked example. Their atom
-  groups (cysteine and caps, spacer, PEG, biotin) describe a cysteine-linked PEG–biotin residue, and the stability
-  check a capped HET-s rod; another system needs them adapted or left out.
+- `linked-analyse` and `free-analyse` are general: they follow any attached or free residue from its anchor (the
+  last atom it shares with its parent amino acid) to its tip, which you can name with `[linked.analysis] tip`;
+  otherwise the atom most bonds from the anchor is taken. Their time windows scale with the length of the run, and
+  both say so when a run is too short to judge.
+- `fibril-run` always runs a general stability check that needs no settings: it finds the chains from the structure
+  and reports whether the Cα RMSD and the radius of gyration have settled and whether every pair of neighbouring
+  chains kept its contacts. A check written for your own system can be run beside it (`[relax.stability]`, as the
+  worked example does for its capped rod), and hydrogen bonds between chosen chains are counted only if you ask
+  (`[relax] hbond`).
 - The NCAA must attach through a side chain and derive from a canonical residue. Proline-like and
   Cα-disubstituted residues are not handled.
 

@@ -30,9 +30,11 @@ within 4.5 A.
      in 10 ns blocks and how many sit on the fibril; and the largest cluster
      among linkers off the fibril (aggregation in solution).
 3. Which part of the linker makes the contacts?  From --from.
-     each linker split by its bonds into cys+caps / spacer / biotin / PEG
-     (11 / 12 / 16 / 38 heavy atoms for Cys-thiosuccinimide-CH2CH2C(O)NH-PEG12-
-     NH-biotin; check the numbers it prints). Contacts per part, linker-linker
+     each linker split by its bonds into four parts: the backbone with its two caps, the
+     atoms near the ANCHOR (where the attached part starts), the TIP group at its far
+     end, and what lies between (check the sizes it prints). The settings RESNAME, CORE,
+     ANCHOR, TIP, NEAR_BONDS, TIP_BONDS and PARTS below describe the residue; the toolbox
+     fills them in from the config. Contacts per part, linker-linker
      and linker-fibril, against the share contacts falling at random would give.
 
 Writes (the CSVs open in Excel; none needs this script to replot):
@@ -62,12 +64,16 @@ CONTACT = 4.5          # A: heavy-atom contact
 EQ_FRACTION = 0.5      # part 1 judges drift over this last fraction of the run
 MIN_VISIT_PS = 1000.0  # part 2: a visit must last this long; shorter gaps are bridged
 MOST = 0.9             # part 2: "throughout" = more than 90% of the window
-BLOCK_PS = 10000.0     # part 2: block length for the cluster table
+BLOCK_PS = None        # part 2: block length for the cluster table; None = a twentieth of the run (10 ns for 200 ns)
 BOND = 1.95            # part 3: heavy atoms closer than this are bonded (C-S is 1.82 A)
-REACH = 7              # part 3: bonds from SG / biotin S that count as spacer / biotin
-CYS_NAMES = {"N", "CA", "CB", "SG", "C", "O"}
-PARTS = ["cys+caps", "spacer", "biotin", "PEG"]
-SMOOTH_NS = 5.0        # running mean drawn over the raw traces
+RESNAME = "CYL"        # the free molecules are ACE-RESNAME-NME
+CORE = ["N", "CA", "CB", "SG", "C", "O"]     # atoms the residue shares with the amino acid it derives from
+ANCHOR = "SG"          # where the attached part starts: the last of those shared atoms
+TIP = None             # the atom at its far end, by name; None = the atom most bonds from ANCHOR
+NEAR_BONDS = 7         # part 3: atoms within this many bonds of ANCHOR are the "near anchor" part
+TIP_BONDS = 7          # part 3: atoms within this many bonds of TIP are the "tip" part
+PARTS = ["backbone+caps", "near anchor", "tip", "middle"]     # names of the four parts, for the tables and figure
+SMOOTH_NS = None       # running mean drawn over the raw traces; None = a fortieth of the run (5 ns for 200 ns)
 TINY = 1e-12
 
 SURFACE, INK, INK2, MUTED, GRID = "#fcfcfb", "#1a1a19", "#52514e", "#8a8984", "#e8e7e3"
@@ -161,24 +167,33 @@ def bfs(adj, start):
 
 
 def classify(names, resnames, adj):
-    """part index (0-3) of each heavy atom of one ACE-CYL-NME linker"""
+    """part index (0-3) of each heavy atom of one ACE-RESNAME-NME molecule, and the tip atom's name"""
     n = len(names)
-    part = np.full(n, -1)
-    for k in range(n):
-        if resnames[k] in ("ACE", "NME") or (resnames[k] == "CYL" and names[k] in CYS_NAMES):
-            part[k] = 0
-    sg = [k for k in range(n) if resnames[k] == "CYL" and names[k] == "SG"]
-    sb = [k for k in range(n) if resnames[k] == "CYL" and element(names[k]) == "S" and names[k] != "SG"]
-    if len(sg) != 1 or len(sb) != 1:
-        sys.exit(f"expected one SG and one other sulfur in CYL, found {len(sg)} and {len(sb)}")
-    d_sg, d_sb = bfs(adj, sg[0]), bfs(adj, sb[0])
-    if np.isinf(d_sg).any():
-        lost = [names[k] for k in np.where(np.isinf(d_sg))[0]]
-        sys.exit(f"bond guessing left {len(lost)} heavy atoms unconnected to SG: {' '.join(lost[:10])}")
-    for k in range(n):
-        if part[k] < 0:
-            part[k] = 1 if d_sg[k] <= REACH else 2 if d_sb[k] <= REACH else 3
-    return part
+    core = np.array([resnames[k] in ("ACE", "NME") or (resnames[k] == RESNAME and names[k] in set(CORE)) for k in range(n)])
+    own = [k for k in range(n) if resnames[k] == RESNAME]
+    a = [k for k in own if names[k] == ANCHOR]
+    if len(a) != 1:
+        sys.exit(f"expected one atom named {ANCHOR} (ANCHOR) in {RESNAME}, found {len(a)}")
+    d_a = bfs(adj, a[0])
+    if np.isinf(d_a).any():
+        lost = [names[k] for k in np.where(np.isinf(d_a))[0]]
+        sys.exit(f"bond guessing left {len(lost)} heavy atoms unconnected to {ANCHOR}: {' '.join(lost[:10])}")
+    if TIP is None:
+        far = np.where(~core, d_a, -1)
+        tip = int(np.flatnonzero(far == far.max())[-1])
+    else:
+        tp = [k for k in own if names[k] == TIP]
+        if len(tp) != 1:
+            sys.exit(f"expected one atom named {TIP} (TIP) in {RESNAME}, found {len(tp)}")
+        tip = tp[0]
+    d_t = bfs(adj, tip)
+    near = NEAR_BONDS
+    while True:
+        part = np.array([0 if core[k] else 1 if d_a[k] <= near else 2 if d_t[k] <= TIP_BONDS else 3 for k in range(n)])
+        if (part >= 2).any() or near == 0:
+            break
+        near = 0                           # a small residue: everything is near the anchor
+    return part, names[tip]
 
 
 def frame_state(fib, lnk, lnk_id, part_all, n_link, box, finder):
@@ -322,7 +337,7 @@ def part2(T, ADS, BIG, FREE, dt):
         members = set(np.where(BIG[np.where(sel)[0][0]])[0])
         same = f"{len(members & prev)}/{len(members)}" if prev is not None else "-"
         prev = members
-        out(f"   {t0/1000:>4.0f}-{(t0 + BLOCK_PS)/1000:<5.0f}{size[sel].mean():>7.2f}{on[sel].mean():>11.2f}"
+        out(f"   {t0/1000:>5.4g}-{(t0 + BLOCK_PS)/1000:<6.4g}{size[sel].mean():>7.2f}{on[sel].mean():>11.2f}"
             f"{same:>14}{FREE[sel].mean():>16.2f}")
     out("   (same members: how many of the cluster's members at the start of the block were")
     out("    also in it at the start of the previous block)")
@@ -397,9 +412,9 @@ def main():
         sys.exit("no ACE residue found -- is this the fibril + linker system?")
     first = rn.index("ACE")
     lres = u.residues[first:]
-    if len(lres) % 3 or any(tuple(rn[first + i:first + i + 3]) != ("ACE", "CYL", "NME")
+    if len(lres) % 3 or any(tuple(rn[first + i:first + i + 3]) != ("ACE", RESNAME, "NME")
                             for i in range(0, len(lres), 3)):
-        sys.exit("residues after the fibril are not a run of ACE-CYL-NME")
+        sys.exit(f"residues after the fibril are not a run of ACE-{RESNAME}-NME (is RESNAME right?)")
     n_link = len(lres) // 3
     fib = u.residues[:first].atoms.select_atoms("not name H*")
     lnk = lres.atoms.select_atoms("not name H*")
@@ -416,6 +431,8 @@ def main():
     for k in (0, 1):
         g = lnk[k * per:(k + 1) * per]
         split.append(classify(list(g.names), list(g.resnames), guess_bonds(g.positions, u.dimensions)))
+    tip_name = split[0][1]
+    split = [x[0] for x in split]
     if not np.array_equal(split[0], split[1]):
         print("WARNING: linkers 1 and 2 split differently -- bond guessing may have failed; using linker 1")
     part1_ = split[0]
@@ -427,10 +444,10 @@ def main():
     stride = max(1, int(round(args.every / dt_traj)))
     dt = stride * dt_traj
     idx = list(range(0, n_traj, stride))
-    out(f"fibril: {first} residues, {fib.n_atoms} heavy atoms; linkers: {n_link} x ACE-CYL-NME, "
+    out(f"fibril: {first} residues, {fib.n_atoms} heavy atoms; linkers: {n_link} x ACE-{RESNAME}-NME, "
         f"{per} heavy atoms each")
     out("linker parts: " + ", ".join(f"{PARTS[a]} {size[a]}" for a in range(4))
-        + "   (expected for this linker: 11, 12, 16, 38)")
+        + f"   (anchor {ANCHOR}, tip {tip_name}" + (", the atom most bonds from the anchor)" if TIP is None else ")"))
     out(f"trajectory: {n_traj} frames, one every {dt_traj:g} ps; analysing {len(idx)}, one every {dt:g} ps")
 
     T, ADS, BIG, FREE, RG, MM, FF = [], [], [], [], [], [], []
@@ -452,6 +469,12 @@ def main():
     MM, FF = np.asarray(MM), np.asarray(FF)
     if len(T) < 20:
         sys.exit(f"only {len(T)} frames analysed -- lower --every")
+    global BLOCK_PS, SMOOTH_NS
+    run_ps = float(T[-1] - T[0])
+    BLOCK_PS = run_ps / 20 if BLOCK_PS is None else float(BLOCK_PS)
+    SMOOTH_NS = run_ps / 40000 if SMOOTH_NS is None else float(SMOOTH_NS)
+    out(f"time windows for this {run_ps / 1000:.4g} ns run: blocks of {BLOCK_PS / 1000:.3g} ns, smoothing {SMOOTH_NS:.3g} ns, "
+        f"visits of at least {MIN_VISIT_PS / 1000:.3g} ns")
 
     cut, verdicts, agg = part1(T, ADS, BIG, RG, n_link)
     start = args.start_ns * 1000.0 if args.start_ns is not None else T[cut]
@@ -468,7 +491,7 @@ def main():
     last = T >= T[-1] - BLOCK_PS + 1e-6
     big_last = BIG.sum(1)[last].mean()
     if big_last > n_link / 2:
-        out(f"  [WARN]  final {BLOCK_PS / 1000:.0f} ns: the largest cluster averages {big_last:.1f} of "
+        out(f"  [WARN]  final {BLOCK_PS / 1000:.3g} ns: the largest cluster averages {big_last:.1f} of "
             f"{n_link} linkers, more than half")
     out(f"  [info]  from {start / 1000:.0f} ns: {len(ex['visited'])} of {n_link} linkers visited the fibril, "
         f"{ex['arrivals']} arrivals / {ex['departures']} departures, "
@@ -496,7 +519,8 @@ def main():
     import json
     json.dump(dict(cut=cut, start=start, n_link=n_link, dt=dt, separate=bool(args.separate), verdicts=verdicts, ex=ex,
                    order=[r[0] for r in sorted(rows, key=lambda r: -r[1])],
-                   SMOOTH_NS=SMOOTH_NS, MIN_VISIT_PS=MIN_VISIT_PS, MOST=MOST, BLOCK_PS=BLOCK_PS, PARTS=PARTS),
+                   SMOOTH_NS=SMOOTH_NS, MIN_VISIT_PS=MIN_VISIT_PS, MOST=MOST, BLOCK_PS=BLOCK_PS, PARTS=PARTS,
+                   RESNAME=RESNAME, ANCHOR=ANCHOR, tip=tip_name),
               open("free_linker_meta.json", "w"), indent=1, default=_json)
     out("\nwrote free_linker_timeseries.csv, free_linker_adsorption.csv, free_linker_per_linker.csv,")
     out("      free_linker_contacts.csv, free_linker_report.txt")

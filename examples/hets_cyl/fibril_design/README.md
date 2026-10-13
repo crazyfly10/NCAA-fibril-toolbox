@@ -6,7 +6,7 @@ AlphaFold and is not part of the toolbox. This folder shows how it was done for 
 
 | Step | What | Script | In | Out |
 |---|---|---|---|---|
-| 1 | Template structure: 2KJ3, model 1, Met217 deleted | PyMOL commands below | `2KJ3.pdb` | object `m1` |
+| 1 | Template structure: 2KJ3, model 1 | PyMOL commands below | `2KJ3.pdb` | object `m1` |
 | 2 | Mutate residue 239 to Cys in all three chains | `mutate_cys239.py` | `m1` | `hets_3mer_mut.pdb` |
 | 3 | Solvent accessibility of Cys239 | `sasa_cys.py` | mutated `m1` | side-chain SASA per chain |
 | 4 | Build the 11-mer | `build_nmer.py` | `hets_3mer_mut.pdb` | `hets11.pdb` |
@@ -29,10 +29,17 @@ load 2KJ3.pdb
 split_states 2KJ3, 1, 1
 delete 2KJ3
 set_name 2KJ3_0001, m1
-remove m1 and resi 217
 ```
 
-Model 1 is kept and the cloning methionine (217) is removed.
+Model 1 is kept.
+
+**The N-terminal methionine is kept.** 2KJ3 was deposited as Met217 + HET-s(218–289) + His tag. We were not sure
+whether that methionine is removed when the protein is made in *E. coli*, so we kept Met217 in every chain; the His
+tag is removed in step 4. Keeping it has a cost in the simulations. With 4 fs steps and repartitioned hydrogen
+masses, the S–CH₃ at this floppy chain end turns far enough in one step to raise LINCS warnings, and `gmx mdrun`
+stops after 1,000 of them. The example therefore runs with `GMX_MAXCONSTRWARN=-1` (set as `mdrun_env` in
+`../config.toml`), which lifts that limit. If your construct has no such methionine, delete it here instead
+(`remove m1 and resi 217`) and leave `mdrun_env` out.
 
 ## 2 · Mutate residue 239 to Cys
 
@@ -59,7 +66,7 @@ run build_nmer.py
 ```
 
 Settings at the top of the script: `SRC = "hets_3mer_mut.pdb"`, `OUT = "hets11.pdb"`, `N_CHAINS = 11`,
-`STRIP = "resi 290-295"` (the His tag). It saves only if no interface clashes; expect 11 chains and 792 Cα.
+`STRIP = "resi 290-295"` (the His tag). It saves only if no interface clashes; expect 11 chains and 803 Cα (73 residues per chain, Met217 to Asn289).
 
 ## 5 · Fold the cap construct
 
@@ -85,7 +92,7 @@ run superimpose_cap.py
 ```
 
 Expected: model 3 fails the screen, model 0 is chosen, residues 1 to 7 are deleted and the cap is shifted 1.1 Å. The
-result is `hets11_capped.pdb`: chains A to K and the cap as chain L.
+result is `hets11_capped.pdb`: chains A to K and the cap as chain L, 12,933 atoms.
 
 ## The result
 

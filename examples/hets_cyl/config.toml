@@ -18,6 +18,10 @@ workdir = "work"                     # each stage writes into its own folder und
 gmx = "gmx_mpi"                      # GROMACS 2026.3 or newer (ships ff19SB as amber19sb.ff)
 pymol = "pymol"                      # used headless (pymol -cq) by linked-build
 mdrun_flags = "-nb gpu -pme gpu"
+mdrun_env = {GMX_MAXCONSTRWARN = "-1"}    # environment for gmx mdrun. This example keeps the N-terminal methionine of every
+                                     # chain (see fibril_design/README.md), whose S-CH3 trips LINCS warnings at 4 fs with
+                                     # repartitioned masses; -1 stops mdrun giving up after 1,000 of them. It also silences
+                                     # every other constraint warning, so leave this line out unless you need it
 
 # ---------------------------------------------------------------- the residue (steps 10-17)
 [ncaa]
@@ -54,7 +58,7 @@ frames_ps = [250, 500, 750, 1000]    # the conformations scattered in the free-l
 
 # A note on the checks, for [ncaa.relax], [relax], [linked] and [free]. After minimisation, NVT and NPT the stage applies
 # the criteria of check_em.py, check_nvt.py and check_npt.py. If all pass it goes on by itself; if one fails it
-# stops before the next run and says what failed. Two settings change that:
+# stops before the next run and says what failed. Three settings change that:
 #   extend_max = 2               when an NVT or NPT check fails, continue that run for its own length again and check afresh,
 #                                up to this many times, before stopping. 0 = stop at the first failure
 #   accept = ["npt"]             go on although that step's checks failed ("em", "nvt", "npt"): you have looked at it
@@ -74,18 +78,26 @@ box_d = 1.2                          # nm between the fibril and the box edge. L
 salt = 0.15
 density_range = [1025, 1055]       # the range expected for this box; leave the line out and it is worked out from what is in the box
 production_ns = 200
-restrain = {chains = ["G"], atoms = ["CA"], fc = 1000}
+restrain = {chains = ["G"], atoms = ["CA"], fc = 1000}    # held in production so the rod cannot turn in its box. An entry is a whole
+                                     # chain ("G") or a stretch of one ("G:226-282"); several entries are allowed
+# hbond: optional. Hydrogen bonds between two chains, averaged over the second half of the run. Only worth having when
+# there is an interface to compare with the others, such as the docked cap here; leave it out otherwise
 hbond = [                            # interfaces compared in step 9: reference chain, target chain:residues
   {name = "K-L", ref = "K", target = "L:8-73"},
   {name = "H-I", ref = "H", target = "I:224-289"},
   {name = "A-B", ref = "B", target = "A:224-289"},
 ]
 
-[relax.stability]                    # a check written for a capped HET-s rod; leave this table out for other fibrils
-script = "check_capped_stability_3.py"
+[relax.stability]                    # optional: a check of your own beside the general one, which always runs. This one
+                                     # is written for a capped HET-s rod (cap junction against the fibril's own junctions)
+script = "analysis/check_capped_stability_3.py"
+plot_script = "analysis/plot_capped_stability.py"
+settings = {HETS_FIRST = 217, HETS_LEN = 73}    # each chain is Met217 to Asn289 here; 218 and 72 if the methionine is removed
 
 # ---------------------------------------------------------------- Run 1: the residue attached (steps 18-27)
 [attach]
+# The sites are yours to choose: look at the structure in PyMOL and give the chain letter and residue number of each
+# residue the molecule should replace. The toolbox does not search for sites, and does not check the residue's type.
 sites = [{chain = "A", resi = 239, label = "chain A"}, {chain = "L", resi = 130, label = "cap"}]
 
 [linked]
@@ -100,22 +112,44 @@ density_range = [1025, 1055]
 restrain = {chains = ["F", "G"], atoms = "N CA C O", fc = 200}
 production_ns = 200
 
-[linked.analysis]                    # linked_eq_check.py: written for CYL (cysteine, spacer, PEG, biotin)
-script = "linked_eq_check.py"
+[linked.analysis]                    # linked_eq_check.py: how each attached residue behaves, and from when the run is usable
+tip = "S1"                           # the atom at the far end of the residue: here the biotin sulfur. Leave out and the
+                                     # atom most bonds from the anchor is taken (the anchor is the last atom shared with
+                                     # the parent, SG here)
+# near_bonds = 7                     # atoms within this many bonds of the anchor are left out of "on the surface"
+# tip_bonds = 7                      # atoms within this many bonds of the tip count as the tip
+# on_min = 5                         # atoms in contact for the residue to count as lying on the protein
+# every_ps = 100                     # read one frame per this many ps (default: every frame)
+# block_ns, tail_ns, smooth_ns, start_step_ns: time windows; by default fractions of the run length
 
 # ---------------------------------------------------------------- Run 2: free capped residues (steps 28-35)
 [free]
-group = "Prot_cyl"
-n_linkers = 40
+# fibril = "my_relaxed_fibril.pdb"   # give this to skip fibril-prepare and fibril-run
+group = "Prot_cyl"                   # name of the solute's thermostat group
+n_linkers = 40                       # free copies of the capped residue; a multiple of the number of frames in
+                                     # [ncaa.relax] frames_ps, which supply their starting shapes
 insert_d = 1.5                       # nm around the fibril that insert-molecules fills
-accept = ["npt"]                     # in this example the NPT ends with the solute about 3 K warm, which is accepted here
+# insert_tries = 1000                # attempts per molecule (gmx insert-molecules -try)
 box = 12.0                           # A. Leave the line out (or "auto") and the fibril is kept one residue's reach
-                                     # plus image_margin_nm (2.0) from its own image
-density_range = [1005, 1030]
+                                     # plus image_margin_nm (2.0) from its own image; reach as under [linked]
+# salt = 0.15                        # M
+density_range = [1005, 1030]         # expected after NPT; leave out and it is worked out from what is in the box
 restrain = {chains = ["F", "G"], atoms = "N CA C O", fc = 200}
 production_ns = 200
+# nvt_ps = 100                       # equilibration lengths
+# npt_ps = 1000
+# temperature = 298                  # K
+accept = ["npt"]                     # in this example the NPT ends with the solute about 3 K warm, which is accepted here.
+                                     # Minimisation is not held here: on a system this size it is expected to end
+                                     # unconverged, and the NVT that follows is the judge
+# extend_max = 2                     # see the note on the checks above
+# stop_before = "production"
 
-[free.analysis]                      # free_linker_analysis.py: written for CYL
-script = "free_linker_analysis.py"
-every_ps = 10
-from_ns = 0
+[free.analysis]                      # free_linker_analysis.py: settling, exchange, and which part makes the contacts
+every_ps = 10                        # read one frame per this many ps
+from_ns = 0                          # where the exchange and contact parts start (default: half the run)
+part_names = ["cys+caps", "spacer", "biotin", "PEG"]    # names for the four parts of the residue in tables and figures:
+                                     # backbone with caps, near the anchor, tip, the rest. The anchor, tip, near_bonds
+                                     # and tip_bonds are taken from [linked.analysis] unless given here too
+# min_visit_ps = 1000                # a visit to the fibril must last this long; shorter gaps are bridged
+# separate_figures = true            # also write each graph as its own PNG

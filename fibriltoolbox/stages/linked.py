@@ -8,7 +8,7 @@ import numpy as np
 
 from .. import amber, gmxmd
 from ..box import advice, atoms_in, auto_buffer, built
-from ..core import StageError, nsteps_for, temp_changes, pdb_atoms, pdb_chains, resindex_ranges, stage, write_mdp
+from ..core import StageError, nsteps_for, restraint_tag, temp_changes, pdb_atoms, pdb_chains, resindex_ranges, stage, write_mdp
 
 
 def ncaa_info(ctx):
@@ -55,11 +55,12 @@ def fibril_pdb(ctx, section):
 
 
 def restraint(ctx, section, chains):
-    """The production restraint as an index group: backbone of the chosen chains -> (tag, group name, selection, fc)."""
+    """The production restraint as an index group -> (tag, group name, selection, fc). Each entry of `chains` is a
+    whole chain ("G") or a stretch of one ("G:226-282", residue numbers as in the structure)."""
     r = ctx.cfg.get(section, {}).get("restrain", {})
     if not r.get("chains"):
         return None
-    tag = "".join(r["chains"])
+    tag = restraint_tag(r["chains"])
     atoms = r.get("atoms", "N CA C O")
     rng = [resindex_ranges(chains, ch) for ch in r["chains"]]
     sel = "(" + " or ".join(f"resindex {a} to {b}" for a, b in rng) + f") and name {atoms}"
@@ -265,13 +266,13 @@ def linked_run(ctx):
 
 @stage("linked-analyse", "linked", "27")
 def linked_analyse(ctx):
-    """linker conformations and adsorption (linked_eq_check.py; its atom groups describe a cysteine-linked PEG-biotin residue)"""
+    """conformations and adsorption of each attached residue; from when the run is usable (linked_eq_check.py)"""
     L = ctx.cfg.get("linked", {})
     A = L.get("analysis", {})
-    name = ctx.cfg["ncaa"]["name"]
+    name, _, _, desc = ncaa_info(ctx)
     out, group = L.get("name", "linked"), L.get("group", "Solute")
     g = ctx.dir / f"{out}.amb2gmx"
-    if ctx.begin("s27", "27 · Linker conformations and adsorption in the linked run"):
+    if ctx.begin("s27", "27 · Conformations and adsorption of the attached residues"):
         ctx.sh(f"{ctx.gmx} trjconv -s prod.tpr -f prod.cpt -n index.ndx -o solute.gro", cwd=g, stdin=group + "\n", log="solute_gro")
         ctx.sh(f"{ctx.gmx} trjconv -s prod.tpr -f prod.xtc -n index.ndx -o solute.xtc", cwd=g, stdin=group + "\n", log="solute_xtc")
         chains = pdb_chains(ctx.dir / "full_fib_noh.pdb")
@@ -280,12 +281,20 @@ def linked_analyse(ctx):
             k = resindex_ranges(chains, f"{s['chain']}:{s['resi']}-{s['resi']}")[0]
             names[f"{name}{k}"] = s.get("label", f"chain {s['chain']}") + f", residue {s['resi']}"
             short[f"{name}{k}"] = s.get("label", f"chain {s['chain']}")
-        skip = {name, "WAT", "SOL", "HOH", "Na+", "Cl-", "NA", "CL", "K+", "K"}
+        # the residue as the analysis needs it: what it shares with its parent, where the attached part starts,
+        # and where it ends (the user's choice; otherwise the atom most bonds from the anchor)
+        core = desc["backbone_names"] + desc["parent_side_names"]
+        ov = dict(RESNAME=name, CORE=core, ANCHOR=A.get("anchor", (desc["parent_side_names"] or ["CA"])[-1]), TIP=A.get("tip"),
+                  NEAR_BONDS=int(A.get("near_bonds", 7)), TIP_BONDS=int(A.get("tip_bonds", 7)), SITE_NAMES=names, SITE_SHORT=short)
+        for key, const in (("contact_A", "CONTACT"), ("on_min", "ON_MIN"), ("start_step_ns", "START_STEP_NS"), ("block_ns", "BLOCK_NS"),
+                           ("tail_ns", "TAIL_NS"), ("smooth_ns", "SMOOTH_NS")):
+            if key in A:
+                ov[const] = A[key]
         args = ["solute.gro", "solute.xtc"] + ([str(A["every_ps"])] if "every_ps" in A else [])
-        o = ctx.script(A.get("script", "linked_eq_check.py"), args, dict(SITE_NAMES=names, SITE_SHORT=short, SKIP_RES=f"py:{skip!r}"), cwd=g)
+        o = ctx.script(A.get("script", "linked_eq_check.py"), args, ov, cwd=g)
         (g / "linked_eq_report.txt").write_text(o)
         gmxmd.draw(ctx, g, A.get("plot_script", "plot_linked_eq.py"))
         ctx.note(f"sites: {names}")
-        ctx.grab(o, re.compile(r"lying on it|latest of these|for the bonded distributions|biotin from"))
+        ctx.grab(o, re.compile(r"^each |lying on it|latest of these|for the bonded distributions|tip from|too short to judge|halves still differ"))
         ctx.note(f"full report: {g / 'linked_eq_report.txt'}; figure and table: linked_eq.png, linked_eq.csv")
         ctx.end()
