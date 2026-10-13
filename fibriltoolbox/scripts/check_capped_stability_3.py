@@ -71,17 +71,17 @@ CORE_CAP = [(10, 18), (21, 29), (46, 54), (57, 66)]            # the cap's own n
 # --- system layout ----------------------------------------------------------
 # 2KJ3 was deposited as M + HET-s(218-289), so the author numbering of a chain's
 # first residue depends on whether that cloning Met was kept: 217 and 73 residues
-# if it was, 218 and 72 if §1 deleted it. Getting this wrong shifts every
+# if it was, 218 and 72 if it was deleted when the template was prepared. Getting this wrong shifts every
 # core selection by a constant and STILL returns 37 atoms, so the atom count
 # cannot catch it -- RESNAME_ANCHORS below is what catches it.
 HETS_FIRST    = 218
 HETS_LEN      = 72
 N_HETS        = 11
-CAP_FIRST_OLD = 8      # the cap's own numbering after §6 deleted residues 1-7
+CAP_FIRST_OLD = 8      # the cap's own numbering after residues 1-7 were deleted when it was docked
 CAP_LEN       = 123
 
 # residues whose identity pins the numbering. 239 is CYS in the fibril chains
-# after the §2 mutation, but the cap was never mutated, so it is VAL there.
+# after the mutation, but the cap was never mutated, so it is VAL there.
 RESNAME_ANCHORS     = {226: "ASN", 239: "CYS", 262: "ASN", 282: "GLY"}
 CAP_RESNAME_ANCHORS = {23: "VAL", 130: "CYS"}
 
@@ -133,7 +133,7 @@ def core_sel_from_block(first, n, res_offset=0):
 
 
 def core_sel_cap(cap_offset=None):
-    """The cap kept its own numbering after §6 deleted residues 1-7, so old
+    """The cap kept its own numbering after residues 1-7 were deleted when it was docked, so old
     cap residue n sits at resid n + CAP_OFFSET."""
     co = CAP_OFFSET if cap_offset is None else cap_offset
     return " or ".join(f"resid {lo+co}:{hi+co}" for lo, hi in CORE_CAP)
@@ -531,5 +531,5 @@ if not HB_OK:
 else:
     print(f"""
     To cross-check these counts against GROMACS, which uses the same geometry but
-    its own bookkeeping, run gmx hbond on the three key pairs -- see §9.
+    its own bookkeeping, run gmx hbond on the three key pairs (gmx hbond).
 """)

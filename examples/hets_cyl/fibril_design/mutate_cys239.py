@@ -1,4 +1,4 @@
-# PyMOL:  run mutate_cys239.py      (after the load / split_states / remove commands of §1)
+# PyMOL:  run mutate_cys239.py      (after the load / split_states / remove commands of step 1)
 # Mutates residue 239 to Cys in every chain of m1 with the Mutagenesis wizard and
 # saves hets_3mer_mut.pdb. For each chain it takes the rotamer with the lowest strain
 # (the wizard's bump score), which is the least-clashing one, and prints what it chose.

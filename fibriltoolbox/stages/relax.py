@@ -1,11 +1,11 @@
-"""The protein-only fibril in water: pdb2gmx, box, equilibration, production and its checks (protocol steps 7-9)."""
+"""The protein-only fibril in water: pdb2gmx, box, equilibration, production and its checks."""
 import re
 import shutil
 from pathlib import Path
 
 from .. import gmxmd
 from ..box import advice, atoms_in, auto_lengths, built
-from ..core import StageError, chain_breaks, nsteps_for, pdb_atoms, pdb_chains, resindex_ranges, stage, write_mdp
+from ..core import StageError, chain_breaks, nsteps_for, temp_changes, pdb_atoms, pdb_chains, resindex_ranges, stage, write_mdp
 
 GROUPS = ["Protein", "Water_and_ions"]
 
@@ -107,7 +107,8 @@ def fibril_run(ctx):
     periodic-image and stability checks and the relaxed fibril.pdb"""
     c, d = ctx.cfg.get("relax", {}), ctx.dir
     src = _structure(ctx)
-    ref_t = float(c.get("temperature", 298.0))
+    T = c.get("temperature")                                   # None = the mdp files' 298 K
+    ref_t = float(T if T is not None else 298.0)
     sec = ("[relax]", c)
     if not (d / "ionised.gro").exists():
         raise StageError("no system to run: run fibril-prepare first")
@@ -119,16 +120,16 @@ def fibril_run(ctx):
 
     ctx.check_gate("em", sec, "the minimisation", "em.png", "NVT")
     if ctx.begin("s7c", "7 · NVT with every protein heavy atom restrained"):
-        write_mdp("fibril_nvt.mdp", d / "nvt.mdp")
+        write_mdp("fibril_nvt.mdp", d / "nvt.mdp", temp_changes("fibril_nvt.mdp", T))
         gmxmd.run_md(ctx, d, "nvt", "nvt.mdp", "em.gro", "topol.top", r="em.gro")
-        gmxmd.judge(ctx, d, "nvt", GROUPS, ref_t)
+        gmxmd.judge(ctx, d, "nvt", GROUPS, ref_t, table=c)
         ctx.end()
 
     ctx.check_gate("nvt", sec, "the NVT equilibration", "nvt.png", "NPT")
     if ctx.begin("s7d", "7 · NPT with every protein heavy atom restrained"):
-        write_mdp("fibril_npt.mdp", d / "npt.mdp")
+        write_mdp("fibril_npt.mdp", d / "npt.mdp", temp_changes("fibril_npt.mdp", T))
         gmxmd.run_md(ctx, d, "npt", "npt.mdp", "nvt.gro", "topol.top", r="nvt.gro", t="nvt.cpt")
-        gmxmd.judge(ctx, d, "npt", GROUPS, ref_t, gmxmd.density_range(ctx, c.get("density_range"), d / "nvt.gro"))
+        gmxmd.judge(ctx, d, "npt", GROUPS, ref_t, gmxmd.density_range(ctx, c.get("density_range"), d / "nvt.gro"), table=c)
         ctx.end()
 
     ctx.check_gate("npt", sec, "the NPT equilibration", "npt.png", "production")
@@ -144,7 +145,8 @@ def fibril_run(ctx):
             ctx.note(f"posre_{ch}.itp: {k} atoms of chain {ch} at {float(rs.get('fc', 1000)):g} kJ/mol/nm2, behind POSRES_{tag}")
         ns = float(c.get("production_ns", 200))
         write_mdp("fibril_prod.mdp", d / "prod.mdp", {"nsteps": nsteps_for("fibril_prod.mdp", ns),
-                                                     "define": f"-DPOSRES_{tag}" if chains else None})
+                                                     "define": f"-DPOSRES_{tag}" if chains else None,
+                                                     **temp_changes("fibril_prod.mdp", T)})
         gmxmd.run_md(ctx, d, "prod", "prod.mdp", "npt.gro", "topol.top", r="npt.gro", t="npt.cpt")
         ctx.note(f"production: {ns:g} ns")
         ctx.end()

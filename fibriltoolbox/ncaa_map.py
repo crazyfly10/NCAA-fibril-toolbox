@@ -1,6 +1,6 @@
 """Find the amino-acid part of a capped non-canonical residue and put it on ff19SB names, types and charges.
 
-This does what the protocol's rename_retype.py does (step 11), without atom numbers typed in by hand. The capped
+This renames and retypes the amino-acid part (step 11) with no atom numbers typed in by hand. The capped
 molecule, ACE-X-NME, is read from antechamber's .ac file as a graph of bonds, and three things are located in it:
 
   the two caps         CH3-C(=O)-  and  -NH-CH3      (removed later by prepgen)
@@ -11,7 +11,6 @@ molecule, ACE-X-NME, is read from antechamber's .ac file as a graph of bonds, an
 Those atoms get the parent's names and ff19SB types from amino19.lib (CA becomes XC, which ties the residue to
 its CMAP). Backbone atoms and caps get ff19SB charges; the leftover is spread over the rest of the residue so it
 sums to the residue's net charge. Everything further out keeps antechamber's names, GAFF2 types and AM1-BCC charges.
-The arithmetic is the protocol script's, so the same molecule gives the same file.
 """
 import json
 import os
@@ -171,7 +170,7 @@ def build_table(g, parent_name, keep=None, fixed=BACKBONE):
         put(h, f"HT{i}", *NME["HT"])
     caps += [bb["NT"]] + _hyd(g, bb["NT"]) + [bb["CAT"]] + _hyd(g, bb["CAT"])
 
-    # the first two side-chain torsions, for the rotamer scan when the residue is grafted (protocol step 18)
+    # the first two side-chain torsions, for the rotamer scan when the residue is grafted
     def onward(prev, cur):
         nxt = [m for m in _heavy(g, cur) if m != prev]
         if not nxt:
@@ -253,7 +252,7 @@ def retype(ac_in, ac_out, parent, net_charge=0, set_charges=True, keep=None, map
 
 
 def write_mc(path, desc):
-    """prepgen's main-chain file (protocol step 12): head N, tail C, main chain CA, the cap atoms to omit."""
+    """prepgen's main-chain file: head N, tail C, main chain CA, the cap atoms to omit."""
     text = "HEAD_NAME N\nTAIL_NAME C\nMAIN_CHAIN CA\n"
     text += "".join(f"OMIT_NAME {n}\n" for n in desc["cap_names"])
     text += f"PRE_HEAD_TYPE C\nPOST_TAIL_TYPE N\nCHARGE {float(desc['net_charge']):.1f}\n"

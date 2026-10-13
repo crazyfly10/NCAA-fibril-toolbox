@@ -1,8 +1,8 @@
-# Designing the capped HET-s fibril (protocol steps 1 to 6)
+# Designing the capped HET-s fibril
 
-These steps produce `hets11_capped.pdb`, the protein-only structure the toolbox starts from (`[relax] structure` in
-`../config.toml`). They are specific to this fibril, so they are done by hand in PyMOL and AlphaFold as in the
-protocol, "ff19SB parameterisation pipeline: Cys–maleimide–PEG12–biotin", and are not part of the toolbox.
+These six steps produce `hets11_capped.pdb`, the protein-only structure the toolbox starts from (`[relax] structure`
+in `../config.toml`). Designing the assembly is specific to each project, so it is done by hand in PyMOL and
+AlphaFold and is not part of the toolbox. This folder shows how it was done for the worked example.
 
 | Step | What | Script | In | Out |
 |---|---|---|---|---|
@@ -13,7 +13,7 @@ protocol, "ff19SB parameterisation pipeline: Cys–maleimide–PEG12–biotin", 
 | 5 | Fold the cap construct, check the fold | AlphaFold Server, `check_cap_fold.py` | cap sequence, `hets11.pdb` | five `*_model_N.cif`, fold RMSD |
 | 6 | Dock the cap on the fibril end | `superimpose_cap.py` | `hets11.pdb`, the five models | `hets11_capped.pdb` |
 
-The scripts are the protocol's own (its section 2 and Appendix A), unchanged. Run each in PyMOL with `run`, from a
+Run each in PyMOL with `run`, from a
 folder that holds the script and its input files. Never paste a script into PyMOL: pasted loops run twice.
 
 ## 1 · Template structure
@@ -75,7 +75,7 @@ Then check that the predicted fold is the fibril's:
 run check_cap_fold.py
 ```
 
-Below about 1.5 Å the cap can stack; in this study the models fitted to 1.06 Å. The cap models are not in this
+Below about 1.5 Å the cap can stack; here the models fitted to 1.06 Å. The cap models are not in this
 repository.
 
 ## 6 · Dock the cap
@@ -89,7 +89,7 @@ result is `hets11_capped.pdb`: chains A to K and the cap as chain L.
 
 ## The result
 
-`hets11_capped.pdb` in this folder is the file the study ran. From here the toolbox takes over:
+`hets11_capped.pdb` in this folder is the result. From here the toolbox takes over:
 
 ```
 cd ..

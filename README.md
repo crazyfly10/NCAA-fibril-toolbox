@@ -17,12 +17,11 @@ trajectory a coarse-grained (MS-IBI) model is fitted to:
 
 Everything runs in the Amber ff19SB force field with GAFF2 for the small molecule and OPC water, in GROMACS.
 
-The toolbox is the pipeline of our protocol, "ff19SB parameterisation pipeline: Cys–maleimide–PEG12–biotin" (35 steps,
-worked out on a HET-s fibril with a Cys–maleimide–PEG12–biotin residue), with its steps 7 to 35 grouped into ten stages
-that run from one config file. What was fixed in the protocol is a setting here: the starting structure, the residue and the
-residue it derives from, the attachment sites, the restrained chains, the box.
+The toolbox groups the work into ten stages that run from one config file. Everything about your system is a
+setting there: the starting structure, the residue and the residue it derives from, the attachment sites, the
+restrained chains, the box.
 
-What it does that the hand-run protocol does not:
+What it takes care of:
 
 - **No atom numbers typed in.** The backbone, the two caps and the atoms the residue shares with its parent amino acid
   are found in the molecule's bond graph and put on ff19SB names, types and charges.
@@ -34,8 +33,8 @@ What it does that the hand-run protocol does not:
   MD stage (with the expected density worked out from what is in the box), a log of every command, and a report
   per stage.
 
-The protocol's own scripts are in `fibriltoolbox/scripts/` unchanged and still run by hand. The toolbox runs them
-through a wrapper that replaces the settings at the top of a script with values from the config.
+The analysis and helper scripts are in `fibriltoolbox/scripts/` and can also be run by hand. The toolbox runs
+them with their settings taken from the config.
 
 
 ## Installation
@@ -68,7 +67,7 @@ python -m fibriltoolbox -h
 python -m fibriltoolbox <stage> [<stage> ...] config.toml
 ```
 
-| Stage | Protocol steps | What it does |
+| Stage | Steps | What it does |
 |---|---|---|
 | `ncaa-param` | 10–16 | capped NCAA `.mol2` → `XXX.prepin`, `frcmod.XXX`, `frcmod.ff19SB_XXX`, checked against the parent residue |
 | `ncaa-relax` | 17 | the capped NCAA in water: the frame to graft, the frames to scatter, its reach |
@@ -81,15 +80,15 @@ python -m fibriltoolbox <stage> [<stage> ...] config.toml
 | `free-run` | 33–34 | minimisation, NVT, NPT, production |
 | `free-analyse` | 35 | settling, exchange, contacts |
 
-The toolbox starts from a protein-only structure of the whole assembly. Designing that structure (protocol steps
-1 to 6 for our fibril: template, mutation, n-mer, cap) is specific to each project and is not part of the toolbox.
+The toolbox starts from a protein-only structure of the whole assembly. Designing that structure is specific
+to each project and is not part of the toolbox.
 
 ### The worked example
 
-[examples/hets_cyl/](examples/hets_cyl/) holds the protocol's own system:
+[examples/hets_cyl/](examples/hets_cyl/) holds a worked example, an 11-chain HET-s fibril with a cap and a
+Cys–maleimide–PEG12–biotin residue attached at two sites:
 
-- [fibril_design/](examples/hets_cyl/fibril_design/): how the capped HET-s fibril was designed by hand (protocol
-  steps 1 to 6), with the PyMOL scripts used and the resulting `hets11_capped.pdb`;
+- [fibril_design/](examples/hets_cyl/fibril_design/): how the capped fibril was designed by hand, with the PyMOL scripts used and the resulting `hets11_capped.pdb`;
 - [config.toml](examples/hets_cyl/config.toml): the toolbox config that takes it from there, every setting commented.
 
 ```bash
@@ -138,23 +137,41 @@ Copy the example config and change:
   After the build, each stage reports the box as built (x, y, z in nm), the water between your construct and the box
   edge on each side, and the distance from the construct to its own periodic image, whichever way the box was set.
 
+  The reach used by the automatic box is measured in `ncaa-relax`, which is why that run is 10 ns by default. Even
+  so it is not a fixed number: two 10 ns runs of the example's PEG12 linker gave a 95% reach of 4.25 and 3.95 nm (two 1 ns
+  runs: 4.11 and 4.61 nm), so the box differs by a few ångström per side from one run to the next. For a box that is
+  identical every time, `reach = "extended"` uses the residue's fully stretched length, worked out from its bonds
+  with no simulation. It is much larger: 7.07 nm for that linker, which gives 1.29 million atoms for the linked
+  fibril against about 0.44 to 0.59 million with the default.
+  If you set your own box in `[linked]` and `[free]`, the reach is not used at all, so shorten the residue's run as
+  well (`[ncaa.relax] production_ns`): it then only has to be long enough for the frames it exports.
+
   A number is the right choice when you know how far your structure can reach and what distance to its image you
   need. Either way, the periodic-image check after production says whether the box held.
 
 ### Checks that hold a run
 
-The run stages (`ncaa-relax`, `fibril-run`, `linked-run`, `free-run`) apply the protocol's criteria after
+The run stages (`ncaa-relax`, `fibril-run`, `linked-run`, `free-run`) apply fixed criteria after
 minimisation, NVT and NPT (`check_em.py`, `check_nvt.py`, `check_npt.py`). If every line passes, the stage goes on to
-the next run by itself. If one fails, it stops before the next run, prints the failed lines, and tells you where the
-plot is. Look at it, then either:
+the next run by itself.
+
+If an NVT or NPT check fails, the stage first gives the run more time: it continues that run for its own
+length again and checks afresh, up to `extend_max` times (default 2; 0 switches this off). The checks look at the
+last half of the run, so each time they judge new data. This matters because the checks are statistical: on the same
+system, about one equilibration in four failed one line by a small margin purely by chance. A chance failure passes
+on the next window; a system that is really not equilibrated keeps failing.
+
+If a check still fails, or the minimisation ends "NOT converged", the stage stops before the next run, prints the
+failed lines, and tells you where the plot is. Look at it, then either:
 
 - add `accept = ["npt"]` (or `"em"`, `"nvt"`) to that stage's table in the config and run the same command again:
   it carries on from where it stopped; or
 - fix the cause and repeat the step.
 
 `stop_before = "production"` makes a stage always stop before production, so the equilibration can be looked at
-first. Minimisation does not hold `ncaa-relax` and `free-run`: the protocol expects it to end unconverged on those
-systems and judges by the next step.
+first. Minimisation is judged by its verdict line: "converged" and "usable" go on, "NOT converged" stops. In
+`ncaa-relax` that is after a second pass, which is tried once if the first does not converge. `free-run` is the
+exception: minimisation is expected to end unconverged on a system that size, and the NVT that follows is the judge.
 
 ### Analysis and plotting are separate scripts
 
@@ -172,8 +189,7 @@ reports do not depend on it. A plotting script can be run again by hand in the f
 | `free_linker_analysis.py` | four `free_linker_*.csv`, `free_linker_meta.json` | `plot_free_linker.py` → `free_linker_overview.png` |
 
 The small `*_meta.json` beside a CSV holds what is not a table: the reference values, the averaging window, labels
-and the verdicts the figure quotes. In the protocol document each of these pairs is still one script; here the
-figure code was moved out unchanged. A figure that fails to draw is reported and does not stop a stage. In the
+and the verdicts the figure quotes. A figure that fails to draw is reported and does not stop a stage. In the
 config, `plot_script` under `[relax.stability]`, `[linked.analysis]` or `[free.analysis]` names your own plotting
 script.
 
@@ -181,7 +197,7 @@ script.
 
 Each stage writes into its own folder under `workdir`:
 
-- its files, named as in the protocol (`CYL.prepin`, `full_fib_noh.pdb`, `linked.amb2gmx/prod.xtc` …);
+- its files (`CYL.prepin`, `full_fib_noh.pdb`, `linked.amb2gmx/prod.xtc` …);
 - `REPORT.md`: the checks and their results, step by step;
 - `commands.log`: every command run, in order, with the settings handed to each script;
 - `logs/`: the full output of each command;
@@ -193,15 +209,15 @@ outlives the terminal, and it can be stopped on its own with `kill $(cat prod.pi
 
 ### Limits of this version
 
-- The toolbox does not build the protein assembly: bring a protein-only PDB of it (see `examples/hets_cyl/fibril_design/` for how ours was made).
-- `linked-analyse`, `free-analyse` and the stability check in `fibril-run` are the study's scripts. Their atom
-  groups (cysteine and caps, spacer, PEG, biotin) describe our linker; another linker needs them adapted.
+- The toolbox does not build the protein assembly: bring a protein-only PDB of it (see `examples/hets_cyl/fibril_design/` for how the example's was made).
+- `linked-analyse`, `free-analyse` and the stability check in `fibril-run` are written for the worked example. Their atom
+  groups (cysteine and caps, spacer, PEG, biotin) describe a cysteine-linked PEG–biotin residue, and the stability
+  check a capped HET-s rod; another system needs them adapted or left out.
 - The NCAA must attach through a side chain and derive from a canonical residue. Proline-like and
   Cα-disubstituted residues are not handled.
 
 ## Data and large files
-This repository holds source code and the small input files of the worked example. The files of the study's own
-runs (trajectories, topologies) are not here. [TODO: put them on Zenodo and link the record here.]
+This repository holds source code and the small input files of the worked example. Trajectories are not stored here.
 
 ## Contributing
 Pull requests are welcome. Every change is reviewed by the maintainer, Harvey Fung, who decides whether it is
@@ -219,7 +235,7 @@ cd examples/hets_cyl && python -m fibriltoolbox ncaa-param config.toml
 **Authors**
 
 - Harvey Fung (Team Imperial College, iGEM 2026)
-- Claude Code (Anthropic's AI coding assistant), which drafted the code in `fibriltoolbox/` from the team's protocol
+- Claude Code (Anthropic's AI coding assistant), which drafted the code in `fibriltoolbox/`
 
 **Please cite**
 
@@ -258,9 +274,8 @@ The structure the worked example starts from, PDB entry 2KJ3:
 
 17. H. Van Melckebeke, C. Wasmer, A. Lange, E. Ab, A. Loquet, A. Böckmann, B. H. Meier. Atomic-resolution three-dimensional structure of HET-s(218–289) amyloid fibrils by solid-state NMR spectroscopy. *J. Am. Chem. Soc.* 132, 13765 (2010).
 
-References 1–13 are those listed in the team's protocol, "ff19SB parameterisation pipeline:
-Cys–maleimide–PEG12–biotin". The toolbox also uses AmberTools (antechamber, parmchk2, tleap), acpype, the ff19SB,
-GAFF2 and OPC models, PyMOL and MDAnalysis; these did not print a reference in our runs, so cite them as their own
+The toolbox also uses AmberTools (antechamber, parmchk2, tleap), acpype, the ff19SB,
+GAFF2 and OPC models, PyMOL and MDAnalysis; these did not print a reference when the example was run, so cite them as their own
 documentation asks.
 
 ## License

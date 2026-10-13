@@ -4,7 +4,7 @@ prep_fibril_tleap.py -- turn a GROMACS-written fibril PDB into one tleap reads.
 
     python3 prep_fibril_tleap.py fibril_box.pdb fib_noh.pdb
 
-Does what fix_names_amber.py (§19) does, without PyMOL, plus two things the
+Does what fix_names_amber.py does, without PyMOL, plus two things the
 free-linker system needs:
   - deletes Met217 (the cloning Met: its light S-CH3 crashed a 4 fs run)
   - writes a TER at every chain break, found from the chain ID OR a drop in the

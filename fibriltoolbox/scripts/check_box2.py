@@ -14,7 +14,7 @@ Prints three checks:
      boundaries handle, so for a slanted box this is reported, not failed.
   2. the closest distance between the protein and its own periodic images,
      which is what actually decides whether the box is big enough. It must be
-     at least min_image_nm (default 2.0 nm, the floor the guide uses);
+     at least min_image_nm (default 2.0 nm, the floor used here);
      editconf -d 1.2 gives about 2.4 nm.
   3. that the protein's centre lies within 0.1 nm of the box centre.
 

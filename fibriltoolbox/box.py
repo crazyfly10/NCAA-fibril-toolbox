@@ -32,8 +32,8 @@ def auto_buffer(pdb, parts, margin_nm=2.0, shrink=0.95, floor_A=10.0):
     box = (extent + 2 * buf) / 10.0
     lines.append("solute extent %.1f x %.1f x %.1f nm; with the flexible parts stretched out %.1f x %.1f x %.1f nm"
                  % (*(extent / 10), *((ehi - elo) / 10)))
-    lines.append("buffer %.1f / %.1f / %.1f A  ->  box about %.1f x %.1f x %.1f nm before NPT (%.0f nm3, roughly %d,000 atoms)"
-                 % (*buf, *box, box.prod(), round(box.prod() * 0.135)))
+    lines.append("buffer %.1f / %.1f / %.1f A  ->  box about %.1f x %.1f x %.1f nm before NPT (%.0f nm3, roughly %s atoms)"
+                 % (*buf, *box, box.prod(), format(round(box.prod() * 0.135) * 1000, ',')))
     return [round(float(b), 1) for b in buf], lines, extent, ehi - elo
 
 
@@ -51,8 +51,8 @@ def auto_gap_buffer(core_pdb, other_pdbs, gap_nm, shrink=0.95, floor_A=10.0):
     box = (ext + 2 * buf) / 10.0
     lines = ["fibril extent %.1f x %.1f x %.1f nm; with the free molecules %.1f x %.1f x %.1f nm" % (*(cext / 10), *(ext / 10)),
              "fibril kept %.2f nm from its own image after NPT" % gap_nm,
-             "buffer %.1f / %.1f / %.1f A  ->  box about %.1f x %.1f x %.1f nm before NPT (%.0f nm3, roughly %d,000 atoms)"
-             % (*buf, *box, box.prod(), round(box.prod() * 0.135))]
+             "buffer %.1f / %.1f / %.1f A  ->  box about %.1f x %.1f x %.1f nm before NPT (%.0f nm3, roughly %s atoms)"
+             % (*buf, *box, box.prod(), format(round(box.prod() * 0.135) * 1000, ','))]
     return [round(float(b), 1) for b in buf], lines, ext, cext
 
 
@@ -69,8 +69,8 @@ def auto_lengths(xyz_nm, parts, margin_nm=3.0, shrink=0.95):
     box = ((ehi - elo) + margin_nm) / shrink
     lines.append("extent %.1f x %.1f x %.1f nm" % tuple(hi - lo) + ("; with the flexible parts stretched out %.1f x %.1f x %.1f nm"
                  % tuple(ehi - elo) if parts else "; no flexible parts listed, so the margin has to cover any tail that moves"))
-    lines.append("margin %.1f nm  ->  box %.2f x %.2f x %.2f nm before NPT (%.0f nm3, roughly %d,000 atoms)"
-                 % (margin_nm, *box, box.prod(), round(box.prod() * 0.13)))
+    lines.append("margin %.1f nm  ->  box %.2f x %.2f x %.2f nm before NPT (%.0f nm3, roughly %s atoms)"
+                 % (margin_nm, *box, box.prod(), format(round(box.prod() * 0.13) * 1000, ',')))
     return [round(float(b), 3) for b in box], lines, hi - lo, ehi - elo
 
 
@@ -82,7 +82,7 @@ def atoms_in(lengths_nm, per_nm3=135):
 def advice(setting, chosen, n_auto, n_fixed, fixed_text, flexible_text, check):
     """What the choice of box costs and risks, said in every stage that makes a box.
     chosen: "auto" or the user's number; n_auto, n_fixed: atom estimates for the automatic box and for the fixed
-    one (the user's number, or the protocol's 12 A when the box is automatic)."""
+    one (the user's number, or a 12 A buffer for comparison when the box is automatic)."""
     r = n_auto / n_fixed
     k = lambda n: f"{round(n, -3):,.0f}"
     if chosen == "auto" and r <= 1.05:

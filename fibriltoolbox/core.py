@@ -119,7 +119,7 @@ class Ctx:
             self.note(f"{what}: {len(fails)} check(s) did not pass; accepted in the config ({where} accept), going on to {nxt}")
             return
         raise StageError(
-            f"{what} did not meet the protocol's criteria, so {nxt} was not started:\n" + "\n".join("    " + l for l in fails) +
+            f"{what} did not meet its criteria, so {nxt} was not started:\n" + "\n".join("    " + l for l in fails) +
             f"\n  Look at {look_at} and REPORT.md under {self.dir}." +
             f"\n  If this is acceptable for your system: add  accept = [\"{key}\"]  under {where} in the config and run the "
             f"same command again; it carries on from here."
@@ -158,7 +158,7 @@ class Ctx:
         return r.stdout
 
     def script(self, name, args=(), overrides=None, cwd=None, pymol=False, log=None, check=True):
-        """Run one of the protocol's scripts. `overrides` replaces settings written at the top of the script
+        """Run one of the scripts in fibriltoolbox/scripts. `overrides` replaces settings written at the top of the script
         (NAME = value) without editing the file; `pymol=True` runs it in headless PyMOL."""
         cwd = Path(cwd or self.dir)
         src = name if os.path.isabs(str(name)) else SCRIPTS / name
@@ -202,6 +202,17 @@ def mdp_value(template, key):
         if "=" in body and body.split("=", 1)[0].strip().replace("-", "_") == key.replace("-", "_"):
             return body.split("=", 1)[1].strip()
     return None
+
+
+def temp_changes(template, T):
+    """mdp changes that put a run at temperature T: every ref_t group, and gen_temp where velocities are generated.
+    T = None (no temperature in the config) changes nothing, so the template's 298 K stands."""
+    if T is None:
+        return {}
+    ch = {"ref_t": " ".join(f"{float(T):g}" for _ in (mdp_value(template, "ref_t") or "x").split())}
+    if mdp_value(template, "gen_temp") is not None:
+        ch["gen_temp"] = f"{float(T):g}"
+    return ch
 
 
 def nsteps_for(template, ns):
@@ -270,7 +281,7 @@ STAGES = {}
 
 
 def stage(name, folder, steps):
-    """Register a stage: its command name, its folder under the work directory, the protocol steps it covers."""
+    """Register a stage: its command name, its folder under the work directory, the steps it covers."""
     def deco(fn):
         def run(cfg):
             ctx = Ctx(cfg, name, cfg.get("folders", {}).get(name, folder))

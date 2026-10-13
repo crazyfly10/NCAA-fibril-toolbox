@@ -1,4 +1,4 @@
-"""GROMACS helpers: grompp, a detached mdrun that can be resumed, energies, the protocol's verdict scripts,
+"""GROMACS helpers: grompp, a detached mdrun that can be resumed, energies, the verdict scripts,
 and the periodic-image check."""
 import os
 import shlex
@@ -104,15 +104,15 @@ def run_em(ctx, d, mdp, c, p, n=None, maxwarn=0, second_pass=True):
     v = ctx.grab(ctx.script("check_em.py", ["potential.xvg", "em.log"], cwd=d))
     draw(ctx, d, "plot_em.py", ["em.csv", "em.png"])
     if second_pass and any("NOT converged" in l for l in v):
-        ctx.note("first pass NOT converged: one more pass from em.gro (protocol step 17)")
+        ctx.note("first pass NOT converged: one more pass from em.gro")
         grompp(ctx, d, mdp, "em.gro", p, "em2.tpr", n=n, maxwarn=maxwarn)
         mdrun(ctx, d, "em2", flags="")
         energy(ctx, d, "em2.edr", ["Potential"], "potential2.xvg")
         v = ctx.grab(ctx.script("check_em.py", ["potential2.xvg", "em2.log"], cwd=d))
         draw(ctx, d, "plot_em.py", ["em.csv", "em.png"])
-        ctx.gate("em", v)
+        ctx.gate("em", [l for l in v if l.startswith("VERDICT")])
         return "em2.gro"
-    ctx.gate("em", v)
+    ctx.gate("em", [l for l in v if l.startswith("VERDICT")])
     return "em.gro"
 
 
@@ -123,20 +123,60 @@ def run_md(ctx, d, name, mdp, c, p, r=None, t=None, n=None, maxwarn=0, flags=Non
     ctx.note(f"{name}: finished, {lincs(d, name)} LINCS warnings" + (f", {ns:.0f} ns/day" if ns else ""))
 
 
-def judge(ctx, d, kind, groups, ref_t=298.0, density=None):
-    """The verdicts of check_nvt.py / check_npt.py for a finished stage; plot_nvt.py / plot_npt.py draw the figure. `groups` are the thermostat groups."""
+def _judge_once(ctx, d, kind, groups, ref_t, density):
     tg = [f"T-{g}" for g in groups if g != "System"]
     if kind == "nvt":
         energy(ctx, d, "nvt.edr", ["Temperature"] + tg + ["Potential", "Pressure"], "nvt.xvg")
         v = ctx.grab(ctx.script("check_nvt.py", ["nvt.xvg"], {"REF_T": ref_t}, cwd=d))
         draw(ctx, d, "plot_nvt.py")
-        ctx.gate("nvt", v)
-        return v
-    energy(ctx, d, "npt.edr", ["Temperature"] + tg + ["Pressure", "Density", "Potential"], "npt.xvg")
-    v = ctx.grab(ctx.script("check_npt.py", ["npt.xvg"] + [str(x) for x in (density or [])], {"REF_T": ref_t}, cwd=d))
-    draw(ctx, d, "plot_npt.py")
-    ctx.gate("npt", v)
+    else:
+        energy(ctx, d, "npt.edr", ["Temperature"] + tg + ["Pressure", "Density", "Potential"], "npt.xvg")
+        v = ctx.grab(ctx.script("check_npt.py", ["npt.xvg"] + [str(x) for x in (density or [])], {"REF_T": ref_t}, cwd=d))
+        draw(ctx, d, "plot_npt.py")
+    ctx.gate(kind, v)
     return v
+
+
+def _run_ps(d, kind):
+    """Length of a finished run in ps: the last time in its energy trace."""
+    last = [l for l in open(Path(d) / f"{kind}.xvg") if l.strip() and l[0] not in "#@"][-1]
+    return float(last.split()[0])
+
+
+def judge(ctx, d, kind, groups, ref_t=298.0, density=None, table=None, flags=None):
+    """The verdicts of check_nvt.py / check_npt.py for a finished stage; plot_nvt.py / plot_npt.py draw the figure.
+    `groups` are the thermostat groups.
+
+    If a line fails, the run is continued for its own length again and checked afresh, up to `extend_max` times
+    (2 unless the stage's config table says otherwise; 0 switches this off). The checks look at the last half of
+    the run, so each time they judge new data: a failure that was chance passes, a system that is not
+    equilibrated keeps failing and holds the stage."""
+    table = table or {}
+    v = _judge_once(ctx, d, kind, groups, ref_t, density)
+    n, k = int(table.get("extend_max", 2)), 0
+    failed = lambda lines: [l for l in lines if "[FAIL]" in l]
+    if not failed(v) or kind in table.get("accept", []):
+        return v
+    first = _run_ps(d, kind)
+    while failed(v) and k < n:
+        k += 1
+        ctx.note(f"{kind.upper()}: {len(failed(v))} check(s) did not pass after {_run_ps(d, kind):g} ps; continuing for another "
+                 f"{first:g} ps and checking again (extension {k} of at most {n})")
+        gro = Path(d) / f"{kind}.gro"
+        gro.rename(Path(d) / f"{kind}_before_extension{k}.gro")
+        ctx.sh(f"{ctx.gmx} convert-tpr -s {kind}.tpr -extend {first:g} -o {kind}.tpr", cwd=d, log=f"extend_{kind}")
+        mdrun(ctx, d, kind, flags=flags)
+        ctx.note(f"{kind}: now {_run_ps_log(d, kind)}, {lincs(d, kind)} LINCS warnings")
+        v = _judge_once(ctx, d, kind, groups, ref_t, density)
+    if k:
+        ctx.note(f"{kind.upper()}: " + (f"every check passes after {k} extension(s), {_run_ps(d, kind):g} ps in all" if not failed(v)
+                                          else f"still {len(failed(v))} check(s) failing after {k} extension(s), {_run_ps(d, kind):g} ps in all"))
+    return v
+
+
+def _run_ps_log(d, kind):
+    ns = performance(d, kind)
+    return "extended" + (f" at {ns:.0f} ns/day" if ns else "")
 
 
 def box_of(gro):
@@ -152,9 +192,8 @@ _WATER = {"SOL", "WAT", "HOH"}
 
 
 def expected_density(gro, window=10.0):
-    """The density range to expect after NPT, worked out from what is in the box. The protocol's ranges (1025-1055
-    for the fibril, 1005-1030 with free linkers) hold for its own boxes only: more water around the same solute
-    means a lower density. Used when the config gives no density_range."""
+    """The density range to expect after NPT, worked out from what is in the box: more water around the same solute
+    means a lower density, so no fixed range fits every box. Used when the config gives no density_range."""
     lines = open(gro).read().split("\n")
     m_wat = m_sol = 0.0
     for l in lines[2:2 + int(lines[1])]:
@@ -180,7 +219,7 @@ def density_range(ctx, given, gro):
 
 
 def image_verdict(xvg):
-    """Smallest periodic-image distance in a `gmx mindist -pi` file, judged as in the protocol (steps 8 and 26)."""
+    """Smallest periodic-image distance in a `gmx mindist -pi` file, judged against 2.0 nm (PASS) and 1.2 nm (FAIL)."""
     rows = [(float(l.split()[0]), float(l.split()[1])) for l in open(xvg) if l.strip() and l[0] not in "#@"]
     t, dmin = min(rows, key=lambda x: x[1])
     b = sum(1 for _, x in rows if x < 2.0)
@@ -193,8 +232,8 @@ def image_verdict(xvg):
 
 
 def image_clean_stretch(xvg, floor=1.2):
-    """After a FAIL: the stretch at the end of the run in which the distance stays above the floor. The protocol
-    analyses only such a stretch (step 26). Returns None when the distance never goes under the floor."""
+    """After a FAIL: the stretch at the end of the run in which the distance stays above the floor: the part
+    of the run that can still be analysed. Returns None when the distance never goes under the floor."""
     rows = [(float(l.split()[0]), float(l.split()[1])) for l in open(xvg) if l.strip() and l[0] not in "#@"]
     bad = [t for t, x in rows if x < floor]
     if not bad:
@@ -207,7 +246,7 @@ def image_clean_stretch(xvg, floor=1.2):
 
 
 def image_check_single(ctx, d, tpr, xtc, ndx, group, dt=100):
-    """Solute that is ONE molecule (tleap/acpype systems): make it whole, then measure (protocol step 26)."""
+    """Solute that is ONE molecule (tleap/acpype systems): make it whole, then measure."""
     ctx.sh(f"{ctx.gmx} convert-tpr -s {tpr} -n {ndx} -o solute_only.tpr", cwd=d, stdin=f"{group}\n", log="convert_tpr")
     ctx.sh(f"{ctx.gmx} trjconv -s {tpr} -f {xtc} -n {ndx} -o whole_solute.xtc -pbc whole -dt {dt}", cwd=d, stdin=f"{group}\n", log="trjconv_whole")
     ctx.sh(f"{ctx.gmx} mindist -s solute_only.tpr -f whole_solute.xtc -pi -od mindist_pi.xvg", cwd=d, stdin="0\n", log="mindist")

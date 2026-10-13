@@ -1,5 +1,5 @@
 ; linked_npt.mdp
-title                   = HET-s 12-mer NPT equilibration
+title                   = NPT equilibration, solute heavy atoms restrained
 define                  = -DPOSRES
 
 integrator              = md

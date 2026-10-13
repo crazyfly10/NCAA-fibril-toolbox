@@ -1,10 +1,10 @@
 """
-§19: GROMACS -> AMBER names, strip hydrogens, write a PDB tleap reads correctly.
+GROMACS -> AMBER names, strip hydrogens, write a PDB tleap reads correctly.
 Run in PyMOL:  run fix_names_amber.py
 """
 from pymol import cmd
 
-IN  = "full_fib.pdb"    # from place_linker.py
+IN  = "full_fib.pdb"    # from place_ncaa.py
 OUT = "full_fib_noh.pdb"
 
 cmd.delete("all")

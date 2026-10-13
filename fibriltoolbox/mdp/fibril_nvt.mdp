@@ -1,5 +1,5 @@
-; nvt.mdp (capped fibril, §7)
-title                   = HET-s 12-mer NVT equilibration
+; nvt.mdp (protein-only assembly)
+title                   = NVT equilibration, protein heavy atoms restrained
 define                  = -DPOSRES
 
 integrator              = md

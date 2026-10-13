@@ -7,7 +7,7 @@ from .stages import ncaa, relax, linked, free  # noqa: F401  (importing register
 
 
 def main():
-    listing = "\n".join(f"  {k:<15} protocol steps {v.steps:<10} {(v.__doc__ or '').strip().splitlines()[0]}"
+    listing = "\n".join(f"  {k:<15} steps {v.steps:<17} {(v.__doc__ or '').strip().splitlines()[0]}"
                         for k, v in STAGES.items())
     ap = argparse.ArgumentParser(prog="python -m fibriltoolbox", formatter_class=argparse.RawDescriptionHelpFormatter,
                                  description="Run one stage of the pipeline from a config file.",

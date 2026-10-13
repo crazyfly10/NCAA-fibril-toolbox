@@ -1,4 +1,4 @@
-"""Run 2: the fibril with free copies of the capped residue around it. Build (protocol steps 28-32), run (33-34),
+"""Run 2: the fibril with free copies of the capped residue around it. Build, run (33-34),
 analyse (35)."""
 import json
 import re
@@ -8,8 +8,8 @@ import numpy as np
 
 from .. import amber, gmxmd
 from ..box import advice, atoms_in, auto_gap_buffer, built
-from ..core import StageError, pdb_atoms, pdb_chains, stage
-from .linked import build_gromacs, equilibrate, fibril_pdb, ncaa_info, ncaa_reach, prep_for_tleap, production, restraint
+from ..core import StageError, pdb_atoms, pdb_chains, stage, temp_changes
+from .linked import build_gromacs, equilibrate, fibril_pdb, ncaa_info, ncaa_reach, reach_caveat, prep_for_tleap, production, restraint
 
 
 @stage("free-build", "free", "28-32")
@@ -65,6 +65,7 @@ def free_build(ctx):
                 ctx.note(f"auto box: a free {name} reaches {r_nm:.2f} nm; margin {margin:.1f} nm")
                 for l in lines:
                     ctx.note("auto box: " + l)
+                reach_caveat(ctx, F, relax)
             for l in advice("[free] box", box, atoms_in((ext + 2 * np.array(abox)) / 10), atoms_in((ext + 2 * fixed) / 10), f"a {fixed:g} A buffer",
                             f"A free {name} reaches {r_nm:.2f} nm, and one lying on the fibril could then touch the fibril's image too.",
                             "gmx mindist -pi on the Fibril group after the run"):
@@ -112,13 +113,13 @@ def free_run(ctx):
     equilibrate(ctx, g, out, group, rs, "free_npt.mdp", F.get("density_range"), float(F.get("temperature", 298.0)), F,
                 where="[free]", gate_em=False)
     if ctx.begin("s34", "34 · Production with the chosen chains restrained"):
-        production(ctx, g, group, rs, "free_prod.mdp", float(F.get("production_ns", 200)), {"compressed-x-grps": group})
+        production(ctx, g, group, rs, "free_prod.mdp", float(F.get("production_ns", 200)), {"compressed-x-grps": group, **temp_changes("free_prod.mdp", F.get("temperature"))})
         ctx.end()
 
 
 @stage("free-analyse", "free", "35")
 def free_analyse(ctx):
-    """settling, exchange and contacts (the study's free_linker_analysis.py; its atom groups describe CYL)"""
+    """settling, exchange and contacts (free_linker_analysis.py; its atom groups describe a cysteine-linked PEG-biotin residue)"""
     F = ctx.cfg.get("free", {})
     A = F.get("analysis", {})
     out, group = F.get("name", "free"), F.get("group", "Solute")

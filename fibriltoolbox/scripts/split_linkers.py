@@ -14,7 +14,7 @@ would turn every linker's N-methyl cap into a methionine.
 
 What this writes:
   - heavy atoms only; tleap rebuilds the hydrogens from CYL.prepin and the
-    ACE/NME templates, as §19 does for the fibril
+    ACE/NME templates, as fix_names_amber.py does for the fibril
   - residues renumbered 1..3N, atoms renumbered 1..
   - one TER after each NME and nowhere else: every ACE-CYL-NME is its own
     molecule, and no TER falls between ACE and CYL -- tleap reads every TER as a

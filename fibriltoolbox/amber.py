@@ -16,7 +16,7 @@ LEAP_BAD = re.compile(r"FATAL|does not have a type|could not find", re.I)
 
 
 def copy_ncaa_files(ctx, src, dst, name):
-    """The three files that carry the residue into tleap (protocol steps 12-14)."""
+    """The three files that carry the residue into tleap."""
     for f in (f"{name}.prepin", f"frcmod.{name}", f"frcmod.ff19SB_{name}"):
         if not (Path(src) / f).exists():
             raise StageError(f"{f} not found in {src}: run ncaa-param first, or point [ncaa] files_from at it")
@@ -31,7 +31,7 @@ def _box_cmd(unit, box, shape="Box"):
 
 
 def tleap_build(ctx, d, name, out, body, unit, box, shape="Box", salt=0.15, pairs=None, extra_save=""):
-    """Build, solvate and add salt (protocol steps 20 and 30). tleap takes ion counts, not a concentration, so it
+    """Build, solvate and add salt. tleap takes ion counts, not a concentration, so it
     runs twice: once to read the charge and the number of waters, once with the ions. `body` is the tleap text that
     makes `unit`; returns the charge, the waters added, and the ion pairs used."""
     d = Path(d)
@@ -64,7 +64,7 @@ def tleap_build(ctx, d, name, out, body, unit, box, shape="Box", salt=0.15, pair
 
 
 def acpype(ctx, d, out):
-    """Amber -> GROMACS (protocol steps 17, 21, 31), then the ion-order repair acpype still needs."""
+    """Amber -> GROMACS, then the ion-order repair acpype still needs."""
     d = Path(d)
     g = d / f"{out}.amb2gmx"
     if not (g / f"{out}_GMX.top").exists():
@@ -74,7 +74,7 @@ def acpype(ctx, d, out):
 
 
 def fix_octahedron_box(gro):
-    """acpype writes the truncated-octahedron box mirrored: negate box elements 6 and 9 (protocol step 17)."""
+    """acpype writes the truncated-octahedron box mirrored: negate box elements 6 and 9."""
     gro = Path(gro)
     shutil.copy(gro, str(gro) + ".orig")
     lines = gro.read_text().rstrip("\n").split("\n")
@@ -110,7 +110,7 @@ def first_molecule(top):
 
 def restraint_files(ctx, g, out, extra_define):
     """acpype's posre file also lists the ions, numbered past the end of the solute, and its topology includes
-    no restraint file at all (protocol steps 23 and 32). Trim the first, write topol.top with both include blocks."""
+    no restraint file at all. Trim the first, write topol.top with both include blocks."""
     g = Path(g)
     name, natoms, nres = first_molecule(g / f"{out}_GMX.top")
     posre = g / f"posre_{out}.itp"
@@ -133,7 +133,7 @@ def restraint_files(ctx, g, out, extra_define):
 
 
 def make_index(ctx, g, gro, groups):
-    """Index groups by residue index, with `gmx select` (protocol step 32). groups: {name: selection}."""
+    """Index groups by residue index, with `gmx select`. groups: {name: selection}."""
     sel = "; ".join(f'"{k}" {v}' for k, v in groups.items())
     ctx.sh(f"{ctx.gmx} select -s {gro} -on index.ndx -select '{sel}'", cwd=g, log="select")
     counts, cur = {}, None

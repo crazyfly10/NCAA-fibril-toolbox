@@ -1,4 +1,4 @@
-; em.mdp (capped fibril, §7)
+; em.mdp (protein-only assembly)
 integrator      = steep
 nsteps          = 50000
 emtol           = 1000.0

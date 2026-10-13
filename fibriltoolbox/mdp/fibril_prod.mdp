@@ -1,5 +1,5 @@
-; prod.mdp (capped fibril, §7)
-title                   = HET-s 12-mer production (chain G restrained)
+; prod.mdp (protein-only assembly)
+title                   = production, chosen chains restrained
 define                  = -DPOSRES_G
 
 ; Run control

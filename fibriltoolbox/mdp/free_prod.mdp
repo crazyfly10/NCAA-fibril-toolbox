@@ -1,5 +1,5 @@
 ; free_prod.mdp
-title                   = HET-s 12-mer production (chains F, G backbone restrained)
+title                   = production, chosen chains restrained
 
 define                  = -DPOSRES_FG
 

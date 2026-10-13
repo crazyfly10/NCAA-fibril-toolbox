@@ -1,6 +1,6 @@
 """Run a script with some of the settings at its top replaced, without editing the script.
 
-The protocol's scripts keep their settings as plain assignments near the top (SRC = "x.pdb", N_CHAINS = 11 ...).
+The scripts keep their settings as plain assignments near the top (SRC = "x.pdb", N_CHAINS = 11 ...).
 This wrapper parses the script, swaps the value of every top-level assignment named in the overrides, and runs
 the result as if the script had been started directly. It works under plain Python and inside PyMOL:
 

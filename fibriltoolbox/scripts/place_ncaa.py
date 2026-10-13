@@ -1,7 +1,6 @@
 # PyMOL:  run place_ncaa.py
-# Grafts the equilibrated non-canonical residue onto residues of the fibril (protocol step 18).
-# This is the protocol's place_linker.py, made to take any residue name, any number of sites and the
-# side-chain torsions of any residue: superimpose on N, CA, C, CB, scan the first side-chain torsions for the
+# Grafts the equilibrated non-canonical residue onto residues of the fibril (step 18).
+# Takes any residue name, any number of sites and the side-chain torsions of any residue: superimpose on N, CA, C, CB, scan the first side-chain torsions for the
 # fewest clashes, replace the residue. Each site avoids the ones placed before it.
 import itertools
 from pymol import cmd

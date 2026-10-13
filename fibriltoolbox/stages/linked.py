@@ -1,4 +1,4 @@
-"""Run 1: the fibril with the residue attached. Build (protocol steps 18-21, 23), run (22, 24-26), analyse (27)."""
+"""Run 1: the fibril with the residue attached. Build, run (22, 24-26), analyse (27)."""
 import json
 import re
 import shutil
@@ -8,7 +8,7 @@ import numpy as np
 
 from .. import amber, gmxmd
 from ..box import advice, atoms_in, auto_buffer, built
-from ..core import StageError, nsteps_for, pdb_atoms, pdb_chains, resindex_ranges, stage, write_mdp
+from ..core import StageError, nsteps_for, temp_changes, pdb_atoms, pdb_chains, resindex_ranges, stage, write_mdp
 
 
 def ncaa_info(ctx):
@@ -21,11 +21,29 @@ def ncaa_info(ctx):
 
 
 def ncaa_reach(c, relax):
-    """The residue's reach in nm: `reach` is "median", "p95" (default), "max", or a number."""
+    """The residue's reach in nm: `reach` is "median", "p95" (default) or "max" from its run in water, "extended" for
+    its fully stretched length (no simulation behind it, so the same every time), or a number."""
     q = c.get("reach", "p95")
     if isinstance(q, (int, float)):
         return float(q)
-    return json.loads((relax / "reach.json").read_text())[{"max": "max_nm", "p95": "p95_nm", "median": "median_nm"}[q]]
+    keys = {"max": "max_nm", "p95": "p95_nm", "median": "median_nm", "extended": "extended_nm"}
+    if q not in keys:
+        raise StageError(f'reach has to be "median", "p95", "max", "extended" or a number in nm, not {q!r}')
+    data = json.loads((relax / "reach.json").read_text())
+    if keys[q] not in data:
+        raise StageError(f'reach.json has no {keys[q]}: run ncaa-relax again with this version to have it worked out')
+    return data[keys[q]]
+
+
+def reach_caveat(ctx, c, relax):
+    """A line for the report when the automatic box rests on the median or 95% reach of a short residue run."""
+    f = relax / "reach.json"
+    if isinstance(c.get("reach", "p95"), (int, float)) or c.get("reach", "p95") in ("max", "extended") or not f.exists():
+        return
+    ns = json.loads(f.read_text()).get("run_ns")
+    if ns is not None and ns < 5:
+        ctx.note(f"auto box: the reach comes from a {ns:g} ns run of the residue, too short for this value to be settled: the box "
+                 "will differ a little from one such run to the next. Run ncaa-relax for 10 ns or more, or set reach = \"extended\"")
 
 
 def fibril_pdb(ctx, section):
@@ -55,7 +73,7 @@ def prep_for_tleap(ctx, d, src, dst):
 
 
 def build_gromacs(ctx, d, out, waters):
-    """acpype and its repairs, shared by the linked and the free-linker builds (protocol steps 21 and 31)."""
+    """acpype and its repairs, shared by the linked and the free-linker builds."""
     name = ctx.cfg["ncaa"]["name"]
     g = amber.acpype(ctx, d, out)
     top = (g / f"{out}_GMX.top").read_text()
@@ -71,10 +89,11 @@ def build_gromacs(ctx, d, out, waters):
 
 
 def equilibrate(ctx, g, out, group, rs, npt_mdp, density, ref_t, sec=None, where="[linked]", gate_em=True):
-    """EM, NVT, NPT with every solute heavy atom restrained (protocol steps 22, 24 and 33).
-    [linked] / [free] nvt_ps and npt_ps change the lengths; the defaults are the protocol's 100 ps and 1 ns."""
+    """EM, NVT, NPT with every solute heavy atom restrained.
+    [linked] / [free] nvt_ps and npt_ps change the lengths; the defaults are 100 ps and 1 ns."""
     tc = {"tc-grps": f"{group} Water_and_ions"}
     sec = sec or {}
+    T = sec.get("temperature")                                 # None = the mdp files' 298 K
     nvt_n = {"nsteps": nsteps_for("linked_nvt.mdp", float(sec["nvt_ps"]) / 1000)} if "nvt_ps" in sec else {}
     npt_n = {"nsteps": nsteps_for(npt_mdp, float(sec["npt_ps"]) / 1000)} if "npt_ps" in sec else {}
     if ctx.begin("em", "Energy minimisation"):
@@ -85,15 +104,15 @@ def equilibrate(ctx, g, out, group, rs, npt_mdp, density, ref_t, sec=None, where
     if gate_em:
         ctx.check_gate("em", gsec, "the minimisation", "em.png", "NVT")
     if ctx.begin("nvt", "NVT with the solute restrained"):
-        write_mdp("linked_nvt.mdp", g / "linked_nvt.mdp", {**tc, **nvt_n})
+        write_mdp("linked_nvt.mdp", g / "linked_nvt.mdp", {**tc, **nvt_n, **temp_changes("linked_nvt.mdp", T)})
         gmxmd.run_md(ctx, g, "nvt", "linked_nvt.mdp", "em.gro", "topol.top", r="em.gro", n="index.ndx", maxwarn=1)
-        gmxmd.judge(ctx, g, "nvt", [group, "Water_and_ions"], ref_t)
+        gmxmd.judge(ctx, g, "nvt", [group, "Water_and_ions"], ref_t, table=sec)
         ctx.end()
     ctx.check_gate("nvt", gsec, "the NVT equilibration", "nvt.png", "NPT")
     if ctx.begin("npt", "NPT with the solute restrained"):
-        write_mdp(npt_mdp, g / npt_mdp, {**tc, **npt_n})
+        write_mdp(npt_mdp, g / npt_mdp, {**tc, **npt_n, **temp_changes(npt_mdp, T)})
         gmxmd.run_md(ctx, g, "npt", npt_mdp, "nvt.gro", "topol.top", r="nvt.gro", t="nvt.cpt", n="index.ndx", maxwarn=1)
-        gmxmd.judge(ctx, g, "npt", [group, "Water_and_ions"], ref_t, gmxmd.density_range(ctx, density, g / "nvt.gro"))
+        gmxmd.judge(ctx, g, "npt", [group, "Water_and_ions"], ref_t, gmxmd.density_range(ctx, density, g / "nvt.gro"), table=sec)
         ctx.note(f"box before NPT {' x '.join(gmxmd.box_of(g / 'nvt.gro')[:3])}, after {' x '.join(gmxmd.box_of(g / 'npt.gro')[:3])} nm")
         ctx.end()
     ctx.check_gate("npt", gsec, "the NPT equilibration", "npt.png", "production")
@@ -101,7 +120,7 @@ def equilibrate(ctx, g, out, group, rs, npt_mdp, density, ref_t, sec=None, where
 
 
 def production(ctx, g, group, rs, mdp, ns, extra=None):
-    """Production with only the chosen chains' backbone restrained (protocol steps 25 and 34)."""
+    """Production with only the chosen chains' backbone restrained."""
     changes = {"tc-grps": f"{group} Water_and_ions", "nsteps": nsteps_for(mdp, ns), "define": None, **(extra or {})}
     if rs:
         tag, rgroup, _, fc = rs
@@ -186,6 +205,7 @@ def linked_build(ctx):
             if box == "auto":
                 for l in lines:
                     ctx.note("auto box: " + l)
+                reach_caveat(ctx, L, relax)
             for l in advice("[linked] box", box, atoms_in((ext + 2 * np.array(abox)) / 10), atoms_in((ext + 2 * fixed) / 10), f"a {fixed:g} A buffer",
                             f"The attached {name} reaches {r_nm:.2f} nm from its backbone.", "the periodic image check of step 26"):
                 ctx.note(l)
@@ -229,7 +249,8 @@ def linked_run(ctx):
     rs = restraint(ctx, "linked", pdb_chains(ctx.dir / "full_fib_noh.pdb"))
     equilibrate(ctx, g, out, group, rs, "linked_npt.mdp", L.get("density_range"), float(L.get("temperature", 298.0)), L)
     if ctx.begin("s25", "25 · Production with the chosen chains restrained"):
-        production(ctx, g, group, rs, "linked_prod.mdp", float(L.get("production_ns", 200)))
+        production(ctx, g, group, rs, "linked_prod.mdp", float(L.get("production_ns", 200)),
+                   temp_changes("linked_prod.mdp", L.get("temperature")))
         ctx.end()
     if ctx.begin("s26", "26 · Periodic image distance of the fibril with its linkers"):
         dmin = gmxmd.image_check_single(ctx, g, "prod.tpr", "prod.xtc", "index.ndx", group, int(L.get("image_check_dt_ps", 100)))
@@ -244,7 +265,7 @@ def linked_run(ctx):
 
 @stage("linked-analyse", "linked", "27")
 def linked_analyse(ctx):
-    """linker conformations and adsorption (the study's linked_eq_check.py; its atom groups describe CYL)"""
+    """linker conformations and adsorption (linked_eq_check.py; its atom groups describe a cysteine-linked PEG-biotin residue)"""
     L = ctx.cfg.get("linked", {})
     A = L.get("analysis", {})
     name = ctx.cfg["ncaa"]["name"]
