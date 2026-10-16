@@ -1,0 +1,42 @@
+{
+ "labels": [
+  "CYL23",
+  "CYL926"
+ ],
+ "n_distal": 54,
+ "mark_ns": null,
+ "CONTACT": 4.5,
+ "RESNAME": "CYL",
+ "ANCHOR": "SG",
+ "tip": "S1",
+ "tip_atoms": 16,
+ "on_min": 5,
+ "start_ns": 90.0,
+ "usable": false,
+ "summary": [
+  {
+   "label": "CYL23",
+   "lying": 0.7769111544422779,
+   "tip_on": 0.7451127443627819,
+   "tip_from_ns": 71.89,
+   "contacts_from_ns": null
+  },
+  {
+   "label": "CYL926",
+   "lying": 0.7787610619469026,
+   "tip_on": 0.6264186790660466,
+   "tip_from_ns": 140.41,
+   "contacts_from_ns": 171.3
+  }
+ ],
+ "SITE_NAMES": {
+  "CYL23": "chain A, residue 239",
+  "CYL926": "cap, residue 130"
+ },
+ "SITE_SHORT": {
+  "CYL23": "chain A",
+  "CYL926": "cap"
+ },
+ "SMOOTH_NS": 5.0,
+ "TAIL_NS": 20.0
+}

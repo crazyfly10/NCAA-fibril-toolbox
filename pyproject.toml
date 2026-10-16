@@ -3,19 +3,20 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fibriltoolbox"
+name = "ncaaprotein"
 version = "0.1.0"
-description = "All-atom trajectories of a fibril carrying a non-canonical amino acid (ff19SB / GAFF2 / OPC, GROMACS)"
+description = "All-atom trajectories of a protein carrying a non-canonical amino acid (ff19SB / GAFF2 / OPC, GROMACS)"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "Apache-2.0"}
+authors = [{name = "Harvey Fung"}]
 dependencies = ["numpy", "networkx", "parmed", "MDAnalysis", "matplotlib"]
 
 [project.scripts]
-fibriltoolbox = "fibriltoolbox.cli:main"
+ncaaprotein = "ncaaprotein.cli:main"
 
 [tool.setuptools]
-packages = ["fibriltoolbox", "fibriltoolbox.stages"]
+packages = ["ncaaprotein", "ncaaprotein.stages"]
 
 [tool.setuptools.package-data]
-fibriltoolbox = ["scripts/*.py", "mdp/*.mdp"]
+ncaaprotein = ["scripts/*.py", "mdp/*.mdp"]

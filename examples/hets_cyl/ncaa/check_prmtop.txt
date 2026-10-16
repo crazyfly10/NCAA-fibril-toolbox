@@ -1,0 +1,26 @@
+Residue CYL 3: 152 atoms, net charge +0.000000
+  types: N=N  H=H  CA=XC  HA=H1  CB=2C  C=C  O=O  SG=S
+  CMAP present (24x24 grid)
+
+Backbone torsions about N-CA and CA-C (ff19SB zeroes these; the CMAP does the work):
+  +N-C-CA-CB               sum|k| = 0.0000 
+  +N-C-CA-HA               sum|k| = 0.0000 
+  +N-C-CA-N                sum|k| = 0.0000 
+  -C-N-CA-C                sum|k| = 0.0000 
+  -C-N-CA-CB               sum|k| = 0.0000 
+  -C-N-CA-HA               sum|k| = 0.0000 
+  C-CA-N-H                 sum|k| = 0.0000 
+  CB-CA-C-O                sum|k| = 0.0000 
+  CB-CA-N-H                sum|k| = 0.0000 
+  H-N-CA-HA                sum|k| = 0.0000 
+  HA-CA-C-O                sum|k| = 0.0000 
+  N-CA-C-O                 sum|k| = 0.0000 
+
+Compared with CYX 3 in test_CYX.parm7 (terms present in both residues):
+  72 shared terms, 0 differ
+  CMAP grid identical to CYX: True
+  SG Lennard-Jones: CYL rmin=1.9825 eps=0.2824 | CYX rmin=1.9825 eps=0.2824
+
+Rest of the system vs reference: 0 bonded-term differences, 0 atom (type/LJ/charge) differences, 0 CMAP differences
+
+ALL CHECKS PASSED

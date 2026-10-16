@@ -1,0 +1,137 @@
+# Config template for ncaaprotein. Copy it next to your input files, fill in the lines marked <...>,
+# and run the stages in order:
+#
+#   python -m ncaaprotein protein-prepare protein-run config.toml                 # steps 1-4   (optional)
+#   python -m ncaaprotein ncaa-param ncaa-relax config.toml                     # steps 5-12
+#   python -m ncaaprotein linked-build linked-run linked-analyse config.toml    # steps 13-21 (Run 1)
+#   python -m ncaaprotein free-build free-run free-analyse config.toml          # steps 22-29 (Run 2)
+#
+# Paths are relative to this file. A line that starts with # shows a default: remove the # to change it.
+
+[project]
+workdir = "work"                     # each stage writes into its own folder under this one
+# mdp_dir = "my_mdp"                 # a folder of your own mdp files, used in place of the packaged ones where it has a
+                                     # file of the same name. Make it with:  python -m ncaaprotein copy-mdp my_mdp
+
+[tools]
+gmx = "gmx_mpi"                      # GROMACS 2026.3 or newer (ships ff19SB as amber19sb.ff)
+pymol = "pymol"                      # used headless (pymol -cq) by linked-build
+mdrun_flags = "-nb gpu -pme gpu"
+# cpu_jobs = 1                       # CPU processes for the image-distance check of steps 3 and 20; more is faster
+                                     # on a machine with several cores (README, "Using more cores and GPUs")
+# mdrun_env = {GMX_MAXCONSTRWARN = "-1"}    # environment for gmx mdrun. This one stops mdrun giving up after 1,000 LINCS
+                                     # warnings, and silences every other constraint warning too: see the README,
+                                     # "an N-terminal methionine"
+
+# ---------------------------------------------------------------- the protein assembly in water (steps 1-4; optional)
+[relax]
+structure = "<your_assembly.pdb>"    # a protein-only model of the whole assembly, with chain letters
+# box_d = "auto"                     # nm between the protein and the box edge, or "auto": the protein's extent plus
+                                     # image_margin_nm (3.0), with any tail listed as
+                                     # flexible = [{chain = "A", anchor = 20, reach_nm = 2.5}] allowed to stretch that far
+# salt = 0.15                        # M NaCl
+# density_range = [1025, 1055]       # kg/m3 expected after NPT; left out, it is worked out from what is in the box
+production_ns = 200
+restrain = {chains = ["<chain>"], atoms = ["CA"], fc = 1000}    # held in production so the assembly cannot turn in its
+                                     # box. An entry is a whole chain ("G") or a stretch of one ("G:226-282"); several
+                                     # entries are allowed. atoms: names, "heavy" or "all"; or instead of chains and
+                                     # atoms, select = "<gmx select expression>" (README). Remove the line to hold nothing
+# hbond = [{name = "A-B", ref = "B", target = "A:10-80"}]    # optional: hydrogen bonds between two chains, averaged over
+                                     # the second half of the run. Worth having when one interface is to be compared
+                                     # with the others
+
+# [relax.stability]                  # optional: a check of your own beside the general one, which always runs
+# script = "my_stability_check.py"
+# plot_script = "my_stability_plot.py"
+# settings = {NAME = value}          # replaces NAME = ... at the top of your script
+
+# [remove]                           # optional: one residue taken out of every chain, e.g. a cloning methionine
+# resn = "MET"
+# resi = 1                           # residue number as in your structure
+# when = "all"                       # "all" (default): from protein-prepare on; "builds": only in linked-build and free-build
+
+# ---------------------------------------------------------------- the residue (steps 5-12)
+[ncaa]
+name = "<XXX>"                       # three characters, not an existing residue name
+mol2 = "<your_molecule.mol2>"        # drawn capped: acetyl on the N, N-methyl on the C (ACE-X-NME)
+net_charge = 0
+parent = "<CYX>"                     # the canonical residue it derives from, as named in ff19SB (CYX, LYS ...):
+                                     # gives the ff19SB names, types and charges
+# parent_atoms = ["CB", "SG"]        # side-chain atoms shared with the parent (default: as many as match)
+# charge_method = "bcc"              # antechamber -c: "bcc" = AM1-BCC. Other antechamber methods ("gas", "rc" ...) are passed on
+# sqm_keywords = "qm_theory='AM1', grms_tol=0.0005, scfconv=1.d-10, ndiis_attempts=700, maxcyc=0"    # antechamber -ek
+# set_backbone_charges = true        # ff19SB charges on the backbone and caps; false keeps the computed charges everywhere
+# cmap = "generic"                   # "generic": the map ff19SB uses for LEU, CYX and ten others;
+                                     # "parent": the map ff19SB gives the parent
+# accept = ["cmap"]                  # go on although step 11 reports that the generic map differs from the parent's
+# penalty_flag_above = 10.0          # step 8: list parmchk2 entries with a penalty above this for a look by hand
+
+[ncaa.relax]                         # the capped residue alone in water
+# box = 12.0                         # A
+# box_shape = "oct"                  # "oct": truncated octahedron; "box": rectangular
+# salt = 0.15                        # M; or ion_pairs = N to give the number of Na+/Cl- pairs yourself
+# npt_ps = 200                       # length of the NPT equilibration
+# temperature = 298                  # K
+# production_ns = 10                 # long enough for the residue's reach to settle. The reach is used only by the
+                                     # automatic box of [linked] and [free]; if you set those boxes yourself, a run
+                                     # that covers the frames below is enough
+# graft_frame_ps = 1000              # the conformation grafted onto the protein
+# frames_ps = [250, 500, 750, 1000]  # the conformations scattered in the free run
+
+# The checks, for [ncaa.relax], [relax], [linked] and [free]. After minimisation, NVT and NPT the stage applies the
+# criteria of check_em.py, check_nvt.py and check_npt.py. If all pass it goes on by itself; if one fails it stops
+# before the next run and says what failed. Three settings change that:
+#   extend_max = 2               when an NVT or NPT check fails, continue that run for its own length again and check
+#                                afresh, up to this many times, before stopping. 0 = stop at the first failure
+#   accept = ["npt"]             go on although that step's checks failed ("em", "nvt", "npt"): you have looked at it
+#   stop_before = "production"   always stop before production, to look at the equilibration first
+
+# ---------------------------------------------------------------- Run 1: the residue attached (steps 13-21)
+[attach]
+# The sites are yours to choose: look at the structure in a viewer and give the chain letter and residue number of
+# each residue the molecule should replace. The toolbox does not search for sites or check the residue's type.
+sites = [{chain = "<A>", resi = 0, label = "site 1"}]    # any number of sites
+# clash_within = 1.5                 # A: the build stops if the placed residue has a heavy atom this close to the protein
+
+[linked]
+# protein = "my_relaxed_assembly.pdb" # give this to skip protein-prepare and protein-run
+# group = "Solute"                   # name of the solute's thermostat group
+# box = "auto"                       # buffer in A, or "auto": worked out from the reach of the residue
+# reach = "p95"                      # used by the automatic box: "p95", "median" or "max" from the residue's run in
+                                     # water, "extended" for its fully stretched length, or a number in nm
+# salt = 0.15
+restrain = {chains = ["<chain>"], atoms = "N CA C O", fc = 200}
+production_ns = 200
+
+[linked.analysis]                    # how each attached residue behaves, and from when the run is usable
+# tip = "<atom name>"                # the atom at the far end of the residue. Left out, the atom most bonds from the
+                                     # anchor is taken (the anchor is the last atom shared with the parent)
+# near_bonds = 7                     # atoms within this many bonds of the anchor are left out of "on the surface"
+# tip_bonds = 7                      # atoms within this many bonds of the tip count as the tip
+# every_ps = 100                     # read one frame per this many ps (default: every frame)
+
+# ---------------------------------------------------------------- Run 2: free capped residues (steps 22-29)
+[free]
+# protein = "my_relaxed_assembly.pdb" # give this to skip protein-prepare and protein-run
+# group = "Solute"
+n_ncaa = 40                       # free copies of the capped residue; a multiple of the number of frames in
+                                     # [ncaa.relax] frames_ps, which supply their starting shapes
+# insert_d = 1.5                     # nm around the protein that insert-molecules fills
+# insert_tries = 1000                # attempts per molecule
+# box = "auto"                       # buffer in A, or "auto"
+# salt = 0.15
+restrain = {chains = ["<chain>"], atoms = "N CA C O", fc = 200}
+production_ns = 200
+# nvt_ps = 100
+# npt_ps = 1000
+                                     # this NPT runs at 4 fs with repartitioned masses (free_npt.mdp); the solute then
+                                     # often fails the temperature check. To avoid it, run it at 2 fs: see README, the checks
+# temperature = 298
+
+[free.analysis]                      # settling, exchange, and which part of the residue makes the contacts
+# every_ps = 10                      # read one frame per this many ps
+# from_ns = 0                        # where the exchange and contact parts start (default: half the run)
+# part_names = ["backbone+caps", "near anchor", "tip", "middle"]    # names for the residue's four parts
+# min_visit_ps = 1000                # a visit to the protein must last this long; shorter gaps are bridged
+                                     # (default: a tenth of the run, at most 1000)
+# separate_figures = true            # also write each graph as its own PNG

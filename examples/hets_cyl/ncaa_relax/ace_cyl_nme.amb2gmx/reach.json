@@ -1,0 +1,9 @@
+{
+ "frames": 1001,
+ "run_ns": 1.0,
+ "max_nm": 4.381531238555908,
+ "p95_nm": 4.126230716705322,
+ "median_nm": 3.3817267417907715,
+ "note": "largest CA-to-heavy-atom distance of the residue, per frame",
+ "extended_nm": 7.07320259164589
+}

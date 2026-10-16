@@ -1,0 +1,62 @@
+{
+ "resname": "CYL",
+ "parent": "CYX",
+ "net_charge": 0,
+ "n_atoms": 164,
+ "n_residue_atoms": 152,
+ "cap_names": [
+  "CAY",
+  "HY1",
+  "HY2",
+  "HY3",
+  "CY",
+  "OY",
+  "NT",
+  "HNT",
+  "CAT",
+  "HT1",
+  "HT2",
+  "HT3"
+ ],
+ "heavy_atoms": {
+  "ACE": 3,
+  "CYL": 72,
+  "NME": 2
+ },
+ "backbone_names": [
+  "N",
+  "CA",
+  "C",
+  "O"
+ ],
+ "parent_side_names": [
+  "CB",
+  "SG"
+ ],
+ "chi": [
+  [
+   "N",
+   "CA",
+   "CB",
+   "SG"
+  ],
+  [
+   "CA",
+   "CB",
+   "SG",
+   "C4"
+  ]
+ ],
+ "parent_types": {
+  "N": "N",
+  "H": "H",
+  "CA": "XC",
+  "HA": "H1",
+  "CB": "2C",
+  "HB2": "H1",
+  "HB3": "H1",
+  "SG": "S",
+  "C": "C",
+  "O": "O"
+ }
+}

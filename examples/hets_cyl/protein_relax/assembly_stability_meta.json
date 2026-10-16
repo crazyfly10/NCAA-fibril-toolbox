@@ -1,0 +1,126 @@
+{
+ "chains": [
+  "A",
+  "B",
+  "C",
+  "D",
+  "E",
+  "F",
+  "G",
+  "H",
+  "I",
+  "J",
+  "K",
+  "L"
+ ],
+ "sizes": [
+  73,
+  73,
+  73,
+  73,
+  73,
+  73,
+  73,
+  73,
+  73,
+  73,
+  73,
+  123
+ ],
+ "interfaces": [
+  "A-B",
+  "B-C",
+  "C-D",
+  "D-E",
+  "E-F",
+  "F-G",
+  "G-H",
+  "H-I",
+  "I-J",
+  "J-K",
+  "K-L"
+ ],
+ "contacts": [
+  133,
+  139,
+  142,
+  137,
+  143,
+  142,
+  147,
+  140,
+  142,
+  139,
+  104
+ ],
+ "EQ_FRACTION": 0.5,
+ "Q_MIN": 0.7,
+ "CONTACT_CA": 8.0,
+ "verdicts": [
+  [
+   "C-alpha RMSD has settled",
+   false,
+   "mean 5.06 A; drift +1.21 over the window = 4.68 sigma, 11.7 x its error"
+  ],
+  [
+   "radius of gyration has settled",
+   true,
+   "mean 38.87 A; drift -0.103 over the window = 0.92 sigma, 3.9 x its error"
+  ],
+  [
+   "interface A-B keeps its contacts",
+   true,
+   "81% of 133 kept; limit 70%"
+  ],
+  [
+   "interface B-C keeps its contacts",
+   true,
+   "80% of 139 kept; limit 70%"
+  ],
+  [
+   "interface C-D keeps its contacts",
+   true,
+   "92% of 142 kept; limit 70%"
+  ],
+  [
+   "interface D-E keeps its contacts",
+   true,
+   "90% of 137 kept; limit 70%"
+  ],
+  [
+   "interface E-F keeps its contacts",
+   true,
+   "86% of 143 kept; limit 70%"
+  ],
+  [
+   "interface F-G keeps its contacts",
+   true,
+   "75% of 142 kept; limit 70%"
+  ],
+  [
+   "interface G-H keeps its contacts",
+   true,
+   "86% of 147 kept; limit 70%"
+  ],
+  [
+   "interface H-I keeps its contacts",
+   true,
+   "90% of 140 kept; limit 70%"
+  ],
+  [
+   "interface I-J keeps its contacts",
+   true,
+   "89% of 142 kept; limit 70%"
+  ],
+  [
+   "interface J-K keeps its contacts",
+   true,
+   "91% of 139 kept; limit 70%"
+  ],
+  [
+   "interface K-L keeps its contacts",
+   true,
+   "90% of 104 kept; limit 70%"
+  ]
+ ]
+}

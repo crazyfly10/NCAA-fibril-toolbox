@@ -1,0 +1,21 @@
+12 chains found: A (73 residues), B (73 residues), C (73 residues), D (73 residues), E (73 residues), F (73 residues), G (73 residues), H (73 residues), I (73 residues), J (73 residues), K (73 residues), L (123 residues)
+11 interfaces: A-B (133 contacts), B-C (139 contacts), C-D (142 contacts), D-E (137 contacts), E-F (143 contacts), F-G (142 contacts), G-H (147 contacts), H-I (140 contacts), I-J (142 contacts), J-K (139 contacts), K-L (104 contacts)
+1501 frames, 0-150 ns; judged over the last 50%, from 75 ns
+
+verdict
+  [FAIL]  C-alpha RMSD has settled  (mean 5.06 A; drift +1.21 over the window = 4.68 sigma, 11.7 x its error)
+  [PASS]  radius of gyration has settled  (mean 38.87 A; drift -0.103 over the window = 0.92 sigma, 3.9 x its error)
+  [PASS]  interface A-B keeps its contacts  (81% of 133 kept; limit 70%)
+  [PASS]  interface B-C keeps its contacts  (80% of 139 kept; limit 70%)
+  [PASS]  interface C-D keeps its contacts  (92% of 142 kept; limit 70%)
+  [PASS]  interface D-E keeps its contacts  (90% of 137 kept; limit 70%)
+  [PASS]  interface E-F keeps its contacts  (86% of 143 kept; limit 70%)
+  [PASS]  interface F-G keeps its contacts  (75% of 142 kept; limit 70%)
+  [PASS]  interface G-H keeps its contacts  (86% of 147 kept; limit 70%)
+  [PASS]  interface H-I keeps its contacts  (90% of 140 kept; limit 70%)
+  [PASS]  interface I-J keeps its contacts  (89% of 142 kept; limit 70%)
+  [PASS]  interface J-K keeps its contacts  (91% of 139 kept; limit 70%)
+  [PASS]  interface K-L keeps its contacts  (90% of 104 kept; limit 70%)
+
+1 line(s) did not pass: look at assembly_stability.png before using the relaxed structure
+wrote assembly_stability.csv (1501 frames, 14 columns) and assembly_stability_meta.json  (plot them with plot_assembly_stability.py)

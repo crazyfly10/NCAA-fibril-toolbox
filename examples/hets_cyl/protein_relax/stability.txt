@@ -1,0 +1,130 @@
+
+Statistics over 37500001 steps [ 0.0000 through 150000.0000 ps ], 4 data sets
+All statistics are over 375001 points
+
+Energy                      Average   Err.Est.       RMSD  Tot-Drift
+-------------------------------------------------------------------------------
+Potential                -1.97276e+06        310    1688.22   -2038.59  (kJ/mol)
+Temperature                 298.311     0.0044    1.08194   0.013082  (K)
+Pressure                    1.61133       0.19    97.0544   0.133111  (bar)
+Density                     1042.99      0.099    1.36758   0.671342  (kg/m^3)
+15001 frames, 13832 atoms, 926 residues
+
+position-restrained chains: G  (excluded from the RMSD selection and the interior band)
+
+chains: 12 blocks
+  chain A: resid 1-73  (73 residues)  NMET1 ... CASN73
+  chain B: resid 74-146  (73 residues)  NMET74 ... CASN146
+  chain C: resid 147-219  (73 residues)  NMET147 ... CASN219
+  chain D: resid 220-292  (73 residues)  NMET220 ... CASN292
+  chain E: resid 293-365  (73 residues)  NMET293 ... CASN365
+  chain F: resid 366-438  (73 residues)  NMET366 ... CASN438
+  chain G: resid 439-511  (73 residues)  NMET439 ... CASN511
+  chain H: resid 512-584  (73 residues)  NMET512 ... CASN584
+  chain I: resid 585-657  (73 residues)  NMET585 ... CASN657
+  chain J: resid 658-730  (73 residues)  NMET658 ... CASN730
+  chain K: resid 731-803  (73 residues)  NMET731 ... CASN803
+  chain L: resid 804-926  (123 residues)  NGLY804 ... CCYS926
+numbering checks out: HET-s 217-289 per chain, 926 residues expected 926
+
+  chain A core atoms: 37
+  chain B core atoms: 37
+  chain C core atoms: 37
+  chain D core atoms: 37
+  chain E core atoms: 37
+  chain F core atoms: 37
+  chain G core atoms: 37
+  chain H core atoms: 37
+  chain I core atoms: 37
+  chain J core atoms: 37
+  chain K core atoms: 37
+  chain L core atoms: 37
+
+  hydrogen-bond groups: 66-66 backbone N-H donors and 66-66 C=O acceptors per chain, over the rungs every chain shares
+
+[1] simulation energetics (means over the last 50%)
+    Potential    mean -1973228.507  std 1460.507  drift/ns    -6.933  settled
+    Temperature  mean      298.307  std    0.955  drift/ns     0.000  settled
+    Pressure     mean       -0.083  std   96.764  drift/ns    -0.020  settled
+    Density      mean     1043.176  std    1.338  drift/ns     0.005  settled
+
+[2] interior fibril stability (core CA RMSD against frame 0)
+    selection: 111 core CA (3 chains x 37), chains FHI
+    each frame is least-squares superposed on frame 0 of the trajectory, then
+    the RMSD of those atoms from their frame-0 positions is taken: this asks
+    whether the core still has the shape it started with, not where it sits.
+    NOTE: the chains next to a restrained one are damped by it, so this test
+    is conservative here -- a pass is weaker evidence than in a free run.
+    start 0.00 A, end 1.73 A, mean over the last 50% 1.53 A, scatter about the fit 0.07 A
+    drift across the window +0.093 A = 1.30 sigma, slope +0.001 A/ns = 7.3 x its error  ->  NOT settled
+
+[3] axial spans: core-COM distance of every consecutive pair
+
+    pair       mean/A    sd/A   drift/A   sigma  slope A/ns  settled
+    ------------------------------------------------------------
+    A-B          9.76   0.115    +0.261    3.01      +0.003  NOT settled
+    B-C          9.50   0.067    -0.082    1.32      -0.001  NOT settled
+    C-D          9.44   0.062    +0.082    1.43      +0.001  NOT settled
+    D-E          9.51   0.063    +0.067    1.12      +0.001  NOT settled
+    E-F         10.14   0.225    -0.615    4.46      -0.008  NOT settled
+    F-G         10.36   0.133    -0.203    1.70      -0.003  NOT settled  (touches a restrained chain)
+    G-H          9.73   0.082    -0.112    1.47      -0.001  NOT settled  (touches a restrained chain)
+    H-I          9.54   0.060    +0.021    0.35      +0.000  settled
+    I-J          9.49   0.058    +0.000    0.01      +0.000  settled
+    J-K          9.68   0.085    +0.154    2.13      +0.002  NOT settled
+    K-L         10.97   0.156    +0.002    0.01      +0.000  settled
+
+    interior band (E-F, H-I, I-J): 9.72 +/- 0.31 A
+    other free end (A-B):  9.76 +/- 0.09 A
+    cap junction  (K-L):  10.97 +/- 0.16 A
+
+    cap vs interior band: +1.25 A = 4.1 sigma
+    cap vs other free end: +1.21 A = 6.8 sigma
+
+    The cap junction is itself a free end, so the fair comparison is
+    K-L against A-B, not against the interior:
+    an end monomer has a neighbour on one side only and sits wider.
+
+[4] backbone hydrogen bonds across every junction
+    N-H...O within 3.5 A with an H-N...O angle under 30 deg (gmx hbond's
+    geometry), counted over the two rungs every chain shares, both ways.
+
+    pair        mean     sd    drift   slope /ns  settled
+    ------------------------------------------------------
+    A-B         11.5    1.6     -2.5       -0.03  NOT settled
+    B-C         13.0    1.4     +1.2       +0.02  settled
+    C-D         13.0    1.4     +1.3       +0.02  NOT settled
+    D-E         13.4    1.7     -1.3       -0.02  settled
+    E-F          8.9    1.3     -0.5       -0.01  settled
+    F-G          9.7    1.7     -1.7       -0.02  NOT settled  (touches a restrained chain)
+    G-H         14.1    1.7     -0.0       -0.00  settled  (touches a restrained chain)
+    H-I         13.8    1.9     +1.3       +0.02  settled
+    I-J         13.0    1.5     +0.8       +0.01  settled
+    J-K         12.3    1.6     -1.4       -0.02  settled
+    K-L          5.9    1.2     -0.9       -0.01  settled
+
+    interior band: 11.9    other free end (A-B): 11.5    cap (K-L): 5.9
+    cap / other free end = 0.51, cap / interior = 0.49
+
+    A-B is the criterion and the interior the upper bound, not the other way
+    round: A is a terminal monomer like the cap and frays as one. At or above
+    A-B the cap has formed a real stacked interface; much below it, the cap
+    sits at the right distance without stacking, which checks [2] and [3]
+    cannot tell apart.
+
+    verdict
+    ------------------------------------------------------------
+      [PASS]  K-L span has settled  (mean 10.97 A)
+      [FAIL]  K-L behaves like A-B (< 2 sigma)  (6.8 sigma)
+      [PASS]  K-L below the H-bond ceiling (11.22 A)  (10.97 A = band 9.72 +1.25)
+      [PASS]  A-B below it too, so it is a sound reference  (9.76 A)
+      [FAIL]  interior RMSD has settled  (1.53 A)
+      [FAIL]  K-L holds at least as many H-bonds as A-B  (5.9 vs 11.5)
+      [FAIL]  every interior pair has settled  (E-F)
+
+    wrote stability.csv (3001 frames, 24 columns)
+    wrote stability_rmsd.csv and stability_meta.json  (plot them with plot_capped_stability.py)
+
+    To cross-check these counts against GROMACS, which uses the same geometry but
+    its own bookkeeping, run gmx hbond on the three key pairs (gmx hbond).
+

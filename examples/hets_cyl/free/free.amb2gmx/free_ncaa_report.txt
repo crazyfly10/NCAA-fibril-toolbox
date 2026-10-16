@@ -1,0 +1,106 @@
+protein: 915 residues, 6839 heavy atoms; NCAAs: 40 x ACE-CYL-NME, 77 heavy atoms each
+NCAA parts: cys+caps 11, spacer 12, biotin 16, PEG 38   (anchor SG, tip S1; near anchor: within 7 bonds of it, tip: within 7 bonds of the tip)
+trajectory: 20001 frames, one every 10 ps; analysing 20001, one every 10 ps
+time windows for this 200 ns run: blocks of 10 ns, smoothing 5 ns, visits of at least 1 ns
+
+1. has it settled?   drift judged over 100-200 ns
+   quantity                     mean     drift   sigma
+   NCAAs on the protein         9.31     -2.19    1.06  NOT settled
+   mean NCAA Rg (A)             8.62    +0.486   0.298  NOT settled
+   largest cluster              10.8     +7.96    2.94  NOT settled
+   largest cluster averages 10.8 of 40 NCAAs
+
+2. do the NCAAs come and go?   0-200 ns, visits must last 1 ns
+   on the protein on average       9.01 NCAAs
+   visited the protein             32 of 40
+   on for >90% of the window       2  (NCAA18 NCAA37)
+   never visited                   8
+   arrivals / departures           84 / 80 in 200 ns
+   completed visits                77, median 3.45 ns, longest 167 ns
+
+   NCAAs on the protein for at least 10% of the window:
+      NCAA     on  visits  arrive  leave  longest/ns
+    NCAA37   100%       1       0      0         200
+    NCAA18    90%       3       3      2         146
+    NCAA20    89%       1       1      0         179
+    NCAA38    83%       2       1      2         167
+    NCAA24    78%       9       9      8        63.2
+    NCAA12    76%       5       5      5         112
+    NCAA35    74%       3       3      2         127
+     NCAA7    62%       1       1      1         129
+    NCAA10    41%       4       4      4        67.4
+    NCAA16    38%       1       1      0        75.9
+    NCAA13    38%       6       6      6        63.3
+    NCAA30    36%       3       2      3        74.5
+    NCAA23    25%       4       4      4        25.6
+    NCAA31    21%       6       6      5        23.3
+
+   largest NCAA cluster
+   mean size 8.98; of its members, on average 1.91 (24%) are on the protein
+   in it for >90% of the window: 0  (none)
+
+     block/ns   size on protein  same members off-protein max
+       0-10       4.90       1.52             -            3.17
+      10-20       5.69       2.24           0/6            3.59
+      20-30       5.04       1.23           5/5            4.69
+      30-40       7.36       2.49           5/5            5.33
+      40-50       7.50       3.33           5/8            5.96
+      50-60       7.99       3.98           7/8            5.98
+      60-70       8.00       3.11           8/8            5.36
+      70-80       8.27       2.50           8/8            5.83
+      80-90       8.64       2.94           8/8            6.32
+      90-100      8.00       3.16           8/8            7.04
+     100-110      8.00       3.00           8/8            7.08
+     110-120      8.75       2.30           8/8            8.12
+     120-130     10.00       0.95          0/10            9.05
+     130-140      9.96       0.26         10/10            9.71
+     140-150     10.00       0.13         10/10            9.87
+     150-160     10.04       0.01         10/10           10.04
+     160-170      9.75       0.62          9/11            9.74
+     170-180     10.14       1.54           0/9           10.14
+     180-190     11.29       0.39          0/10           11.29
+     190-200     20.34       2.53         10/13           17.76
+   (same members: how many of the cluster's members at the start of the block were
+    also in it at the start of the previous block)
+
+   largest cluster among NCAAs off the protein: mean 7.80, largest seen 22
+
+3. which part makes the contacts?   20001 frames
+   NCAA-NCAA: 1544 heavy-atom pairs per frame on average
+   parts                   observed  expected   ratio
+   spacer - biotin             8.7%      6.5%    1.34
+   cys+caps - biotin           7.8%      5.9%    1.31
+   cys+caps - cys+caps         2.4%      2.0%    1.20
+   biotin - biotin             5.0%      4.3%    1.17
+   spacer - spacer             2.7%      2.4%    1.11
+   biotin - PEG               22.8%     20.5%    1.11
+   cys+caps - spacer           4.8%      4.5%    1.08
+   cys+caps - PEG             14.8%     14.1%    1.05
+   spacer - PEG               12.1%     15.4%    0.79
+   PEG - PEG                  18.9%     24.4%    0.78
+
+   part          atoms  share of atoms  share of contacts   ratio
+   cys+caps         11           14.3%              16.1%    1.13
+   spacer           12           15.6%              15.5%    0.99
+   biotin           16           20.8%              24.6%    1.19
+   PEG              38           49.4%              43.7%    0.89
+
+   NCAA-protein: 413 heavy-atom pairs per frame on average
+   part          share of atoms  share of contacts   ratio
+   cys+caps               14.3%              16.8%    1.18
+   spacer                 15.6%              21.4%    1.37
+   biotin                 20.8%              24.7%    1.19
+   PEG                    49.4%              37.1%    0.75
+
+verdict
+  [FAIL]  NCAAs on the protein has settled
+  [FAIL]  mean NCAA Rg has settled
+  [FAIL]  largest cluster has settled
+  [PASS]  NCAAs not aggregated into one cluster
+  [WARN]  final 10 ns: the largest cluster averages 20.3 of 40 NCAAs, more than half
+  [info]  from 0 ns: 32 of 40 NCAAs visited the protein, 84 arrivals / 80 departures, 2 on it for >90% of the time
+  take RDFs only from a stretch where all three part-1 traces are flat (panels a-c)
+
+wrote free_ncaa_timeseries.csv, free_ncaa_adsorption.csv, free_ncaa_per_ncaa.csv,
+      free_ncaa_contacts.csv, free_ncaa_report.txt
+      free_ncaa_meta.json; draw the figures from these files with plot_free_ncaa.py

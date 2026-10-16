@@ -1,32 +1,70 @@
 # A worked example: an 11-chain HET-s(218-289) fibril with a poison cap docked on one
 # end, and Cys-maleimide-PEG12-biotin as the residue CYL at A239 and L130.
 #
-# The capped fibril itself is designed by hand in PyMOL and AlphaFold: see fibril_design/.
-# The toolbox starts from its result, fibril_design/hets11_capped.pdb.
+# The capped fibril itself is designed by hand in PyMOL and AlphaFold: see protein_relax/fibril_design/.
+# The toolbox starts from its result, protein_relax/hets11_capped.pdb.
+# The folders beside this file hold the study's own runs, one per stage. Keep workdir a separate folder:
+# the toolbox then writes your run into work/, next to them, and never into them.
 #
 #   cd examples/hets_cyl
-#   python -m fibriltoolbox ncaa-param ncaa-relax fibril-prepare fibril-run config.toml
-#   python -m fibriltoolbox linked-build linked-run linked-analyse config.toml      # Run 1
-#   python -m fibriltoolbox free-build free-run free-analyse config.toml           # Run 2
+#   python -m ncaaprotein protein-prepare protein-run ncaa-param ncaa-relax config.toml
+#   python -m ncaaprotein linked-build linked-run linked-analyse config.toml      # Run 1
+#   python -m ncaaprotein free-build free-run free-analyse config.toml           # Run 2
 #
 # Paths are relative to this file.
 
 [project]
 workdir = "work"                     # each stage writes into its own folder under this one
+# mdp_dir = "my_mdp"                 # a folder of your own mdp files, used in place of the packaged ones where it has a
+                                     # file of the same name. Make it with:  python -m ncaaprotein copy-mdp my_mdp
 
 [tools]
 gmx = "gmx_mpi"                      # GROMACS 2026.3 or newer (ships ff19SB as amber19sb.ff)
 pymol = "pymol"                      # used headless (pymol -cq) by linked-build
 mdrun_flags = "-nb gpu -pme gpu"
 mdrun_env = {GMX_MAXCONSTRWARN = "-1"}    # environment for gmx mdrun. This example keeps the N-terminal methionine of every
-                                     # chain (see fibril_design/README.md), whose S-CH3 trips LINCS warnings at 4 fs with
+                                     # chain (see protein_relax/fibril_design/README.md), whose S-CH3 trips LINCS warnings at 4 fs with
                                      # repartitioned masses; -1 stops mdrun giving up after 1,000 of them. It also silences
                                      # every other constraint warning, so leave this line out unless you need it
 
-# ---------------------------------------------------------------- the residue (steps 10-17)
+# ---------------------------------------------------------------- the fibril in water (steps 1-4; optional)
+[relax]
+structure = "protein_relax/hets11_capped.pdb"    # the protein-only starting structure: here the result of the by-hand design in protein_relax/fibril_design/
+box_d = 1.2                          # nm between the fibril and the box edge. Leave the line out (or "auto") and
+                                     # the box is worked out: the fibril's extent plus image_margin_nm (3.0), with any tail listed as
+                                     # flexible = [{chain = "L", anchor = 20, reach_nm = 2.5}] allowed to stretch that far
+salt = 0.15
+density_range = [1025, 1055]       # the range expected for this box; leave the line out and it is worked out from what is in the box
+production_ns = 150
+# restrain = {chains = ["G"], atoms = ["CA"], fc = 1000}    # what to hold in production so the rod cannot turn in its
+                                     # box. An entry is a whole chain ("G") or a stretch of one ("G:226-282"). This
+                                     # run held nothing in production
+# hbond: optional. Hydrogen bonds between two chains, averaged over the second half of the run. Only worth having when
+# there is an interface to compare with the others, such as the docked cap here; leave it out otherwise
+hbond = [                            # interfaces compared in step 4: reference chain, target chain:residues
+  {name = "A-B", ref = "B", target = "A:224-289"},
+  {name = "E-F", ref = "E", target = "F:224-289"},
+  {name = "F-G", ref = "F", target = "G:224-289"},
+  {name = "H-I", ref = "H", target = "I:224-289"},
+  {name = "K-L", ref = "K", target = "L:8-73"},
+]
+
+[relax.stability]                    # optional: a check of your own beside the general one, which always runs. This one
+                                     # is written for a capped HET-s rod (cap junction against the fibril's own junctions)
+script = "protein_relax/check_capped_stability.py"
+plot_script = "protein_relax/plot_capped_stability.py"
+settings = {HETS_FIRST = 217, HETS_LEN = 73}    # each chain is Met217 to Asn289 here; 218 and 72 if the methionine is removed
+
+[remove]                             # the cloning methionine of every HET-s chain
+resn = "MET"
+resi = 217
+when = "builds"                      # kept in the capped-fibril run (protein_relax/), taken out when the linked and free
+                                     # systems are built
+
+# ---------------------------------------------------------------- the residue (steps 5-12)
 [ncaa]
 name = "CYL"                         # three characters, not an existing residue name
-mol2 = "inputs/12EO_linker.mol2"    # drawn capped: ACE-X-NME
+mol2 = "ncaa/12EO_linker.mol2"    # drawn capped: ACE-X-NME
 net_charge = 0
 parent = "CYX"                       # the canonical residue it derives from: gives the ff19SB names, types, charges
 parent_atoms = ["CB", "SG"]          # side-chain atoms shared with the parent (default: as many as match)
@@ -36,8 +74,8 @@ parent_atoms = ["CB", "SG"]          # side-chain atoms shared with the parent (
 # set_backbone_charges = true        # ff19SB charges on the backbone and caps; false keeps the computed charges everywhere
 # cmap = "generic"                   # "generic": the map ff19SB uses for LEU, CYX and ten others (the generic map);
                                      # "parent": the map ff19SB gives the parent. The same thing when the parent is CYX
-# accept = ["cmap"]                  # go on although step 16 reports that the generic map differs from the parent's
-# penalty_flag_above = 10.0          # step 13: list parmchk2 entries with a penalty above this for a look by hand
+# accept = ["cmap"]                  # go on although step 11 reports that the generic map differs from the parent's
+# penalty_flag_above = 10.0          # step 8: list parmchk2 entries with a penalty above this for a look by hand
 
 [ncaa.relax]                         # the capped residue alone in water
 box = 12.0                           # A, truncated octahedron
@@ -69,39 +107,15 @@ frames_ps = [250, 500, 750, 1000]    # the conformations scattered in the free-l
 # estimate). A small fixed margin such as 12 A lets a flexible region near the box edge reach its own periodic image.
 # This example sets its boxes by hand (12 A margins); leave those lines out for the automatic box.
 
-# ---------------------------------------------------------------- the fibril in water (steps 7-9; optional)
-[relax]
-structure = "fibril_design/hets11_capped.pdb"    # the protein-only starting structure: here the result of steps 1-6
-box_d = 1.2                          # nm between the fibril and the box edge. Leave the line out (or "auto") and
-                                     # the box is worked out: the fibril's extent plus image_margin_nm (3.0), with any tail listed as
-                                     # flexible = [{chain = "L", anchor = 20, reach_nm = 2.5}] allowed to stretch that far
-salt = 0.15
-density_range = [1025, 1055]       # the range expected for this box; leave the line out and it is worked out from what is in the box
-production_ns = 200
-restrain = {chains = ["G"], atoms = ["CA"], fc = 1000}    # held in production so the rod cannot turn in its box. An entry is a whole
-                                     # chain ("G") or a stretch of one ("G:226-282"); several entries are allowed
-# hbond: optional. Hydrogen bonds between two chains, averaged over the second half of the run. Only worth having when
-# there is an interface to compare with the others, such as the docked cap here; leave it out otherwise
-hbond = [                            # interfaces compared in step 9: reference chain, target chain:residues
-  {name = "K-L", ref = "K", target = "L:8-73"},
-  {name = "H-I", ref = "H", target = "I:224-289"},
-  {name = "A-B", ref = "B", target = "A:224-289"},
-]
-
-[relax.stability]                    # optional: a check of your own beside the general one, which always runs. This one
-                                     # is written for a capped HET-s rod (cap junction against the fibril's own junctions)
-script = "analysis/check_capped_stability_3.py"
-plot_script = "analysis/plot_capped_stability.py"
-settings = {HETS_FIRST = 217, HETS_LEN = 73}    # each chain is Met217 to Asn289 here; 218 and 72 if the methionine is removed
-
-# ---------------------------------------------------------------- Run 1: the residue attached (steps 18-27)
+# ---------------------------------------------------------------- Run 1: the residue attached (steps 13-21)
 [attach]
 # The sites are yours to choose: look at the structure in PyMOL and give the chain letter and residue number of each
 # residue the molecule should replace. The toolbox does not search for sites, and does not check the residue's type.
 sites = [{chain = "A", resi = 239, label = "chain A"}, {chain = "L", resi = 130, label = "cap"}]
 
 [linked]
-# fibril = "my_relaxed_fibril.pdb"   # give this to skip fibril-prepare and fibril-run
+protein = "linked/hets11_capped_9.5ns.pdb"    # the relaxed fibril this run started from: the 9.5 ns frame of an earlier
+                                     # capped-fibril run. Leave the line out to start from the end of protein-run
 group = "Prot_cyl"                   # name of the solute's thermostat group
 box = 12.0                           # A. Leave the line out (or "auto") and it is worked out from the reach of the
                                      # residue; image_margin_nm (2.0) and reach adjust that. reach = "p95" (default), "median" or
@@ -109,7 +123,7 @@ box = 12.0                           # A. Leave the line out (or "auto") and it 
                                      # its fully stretched length, the same every time but a much larger box; or give a number in nm
 salt = 0.15
 density_range = [1025, 1055]
-restrain = {chains = ["F", "G"], atoms = "N CA C O", fc = 200}
+restrain = {chains = ["F", "G"], atoms = "all", fc = 200}    # every atom of chains F and G, hydrogens too
 production_ns = 200
 
 [linked.analysis]                    # linked_eq_check.py: how each attached residue behaves, and from when the run is usable
@@ -122,11 +136,12 @@ tip = "S1"                           # the atom at the far end of the residue: h
 # every_ps = 100                     # read one frame per this many ps (default: every frame)
 # block_ns, tail_ns, smooth_ns, start_step_ns: time windows; by default fractions of the run length
 
-# ---------------------------------------------------------------- Run 2: free capped residues (steps 28-35)
+# ---------------------------------------------------------------- Run 2: free capped residues (steps 22-29)
 [free]
-# fibril = "my_relaxed_fibril.pdb"   # give this to skip fibril-prepare and fibril-run
+protein = "free/hets11_capped_101.2ns.pdb"    # the relaxed fibril this run started from: the 101.2 ns frame of the
+                                     # capped-fibril run. Leave the line out to start from the end of protein-run
 group = "Prot_cyl"                   # name of the solute's thermostat group
-n_linkers = 40                       # free copies of the capped residue; a multiple of the number of frames in
+n_ncaa = 40                       # free copies of the capped residue; a multiple of the number of frames in
                                      # [ncaa.relax] frames_ps, which supply their starting shapes
 insert_d = 1.5                       # nm around the fibril that insert-molecules fills
 # insert_tries = 1000                # attempts per molecule (gmx insert-molecules -try)
@@ -145,7 +160,7 @@ accept = ["npt"]                     # in this example the NPT ends with the sol
 # extend_max = 2                     # see the note on the checks above
 # stop_before = "production"
 
-[free.analysis]                      # free_linker_analysis.py: settling, exchange, and which part makes the contacts
+[free.analysis]                      # free_ncaa_analysis.py: settling, exchange, and which part makes the contacts
 every_ps = 10                        # read one frame per this many ps
 from_ns = 0                          # where the exchange and contact parts start (default: half the run)
 part_names = ["cys+caps", "spacer", "biotin", "PEG"]    # names for the four parts of the residue in tables and figures:

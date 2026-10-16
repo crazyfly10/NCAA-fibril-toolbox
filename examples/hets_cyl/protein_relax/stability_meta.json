@@ -1,0 +1,24 @@
+{
+ "HB_OK": true,
+ "pair_names": [
+  "A-B",
+  "B-C",
+  "C-D",
+  "D-E",
+  "E-F",
+  "F-G",
+  "G-H",
+  "H-I",
+  "I-J",
+  "J-K",
+  "K-L"
+ ],
+ "CAP_PAIR": 10,
+ "FREE_END_PAIR": 0,
+ "EQ_FRACTION": 0.5,
+ "core_chains": [
+  "F",
+  "H",
+  "I"
+ ]
+}
