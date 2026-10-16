@@ -1,0 +1,20 @@
+# The conda environment the toolbox runs in, pinned to the versions it was tested with.
+#   conda env create -f environment.yml
+#   conda activate ncaaprotein
+# For the exact environment, every package at the same build: see conda-linux-64.lock.
+name: ncaaprotein
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12.13
+  - gromacs=2026.3=mpi_openmpi_cuda*      # gmx_mpi, with CUDA
+  - ambertools=24.8
+  - acpype=2026.9.4
+  - pymol-open-source=3.1.0
+  - numpy=2.5.1
+  - networkx=3.6.1
+  - parmed=4.3.1
+  - mdanalysis=2.10.0
+  - matplotlib-base=3.10.9
+  - pip

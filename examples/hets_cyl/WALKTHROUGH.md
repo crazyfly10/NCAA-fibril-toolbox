@@ -16,9 +16,11 @@ simulations are run:
 
 **Software:** GROMACS 2026.3 or newer (`gmx_mpi`), AmberTools, acpype 2026.9.3 or newer, PyMOL, and Python 3.11 or
 newer with NumPy, NetworkX, ParmEd, MDAnalysis and matplotlib. A GPU is assumed for the simulations. Install the
-toolbox as the main README describes, then work from this folder:
+toolbox as the [main README](../../README.md#install) describes: its `environment.yml` installs all of these at the
+versions the study used. Then work from this folder:
 
 ```bash
+conda activate ncaaprotein
 cd examples/hets_cyl
 python -m ncaaprotein -h      # lists the stages
 ```

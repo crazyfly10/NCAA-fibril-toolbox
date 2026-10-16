@@ -3,7 +3,12 @@
 This toolbox is designed to allow users to run full atom trajectories of custom NCAAs attached to custom proteins. The aim
 is to generate trajectories that allow MS-IBI to sample bonded and non-bonded interactions for a coarse-grained model.
 
-It was written by Team Imperial College, iGEM 2026.
+It is for researchers and iGEM teams who work with a protein or protein assembly carrying a synthetic side chain and
+need all-atom reference simulations of it, for example to fit a coarse-grained model. It assumes a Linux machine
+with an NVIDIA GPU and some familiarity with GROMACS.
+
+It was written by Team Imperial College, iGEM 2026. For a complete worked example, with the study's results and every
+command that produced them, see [examples/hets_cyl](examples/hets_cyl/README.md).
 
 ## Description
 
@@ -54,12 +59,26 @@ A GPU is assumed for the MD stages (`mdrun_flags` in the config).
 ### Install
 
 ```bash
-conda activate <your environment with GROMACS, AmberTools and acpype>
-git clone <URL of this repository>
-cd <the cloned folder>
-pip install -e .          # or: export PYTHONPATH=$PWD
+git clone https://gitlab.igem.org/2026/software/imperial-college/full-atom-trajectory-for-msibi.git
+cd full-atom-trajectory-for-msibi
+conda env create -f environment.yml
+conda activate ncaaprotein
+pip install -e .
 python -m ncaaprotein -h
 ```
+
+[environment.yml](environment.yml) installs everything in the table above, from conda-forge, at the versions the
+toolbox was tested with: GROMACS 2026.3 (built with CUDA and OpenMPI), AmberTools 24.8, acpype 2026.9.4, PyMOL
+3.1.0, Python 3.12.13, NumPy 2.5.1, NetworkX 3.6.1, ParmEd 4.3.1, MDAnalysis 2.10.0 and matplotlib 3.10.9.
+[conda-linux-64.lock](conda-linux-64.lock) lists every package of that environment at its exact build, for an
+identical copy on Linux x86-64:
+
+```bash
+conda create -n ncaaprotein --file conda-linux-64.lock
+```
+
+To use an environment you already have instead, activate it and run `pip install -e .` (or
+`export PYTHONPATH=$PWD`) in the cloned folder.
 
 ## Usage
 
@@ -339,6 +358,15 @@ outlives the terminal, and it can be stopped on its own with `kill $(cat prod.pi
 - The NCAA must attach through a side chain and derive from a canonical residue. Proline-like and
   Cα-disubstituted residues are not handled.
 
+## Reproducing the results
+
+[examples/hets_cyl](examples/hets_cyl/README.md) is the study the toolbox was written for: an 11-chain HET-s
+amyloid fibril with an engineered cap, carrying CYL (cysteine–maleimide–PEG12–biotin) at two sites. Its
+[README](examples/hets_cyl/README.md) describes what each folder holds, how the study's runs were set up and their
+main results; its [WALKTHROUGH.md](examples/hets_cyl/WALKTHROUGH.md) goes through every command that produces them,
+stage by stage. The example's [config.toml](examples/hets_cyl/config.toml) runs the whole pipeline, and its folders
+hold the study's own outputs, named as the toolbox writes them, so a new run can be compared with them file by file.
+
 ## Data and large files
 This repository holds source code and small input files. Trajectories are not stored here.
 
@@ -354,7 +382,7 @@ compare the residue's `.prepin` and `frcmod` files in `work/ncaa/`. It needs no 
 **Authors**
 
 - Harvey Fung (Team Imperial College, iGEM 2026)
-- Claude Code (Anthropic's AI coding assistant), which drafted the code in `ncaaprotein/`
+- Claude Code (Anthropic's AI coding assistant), which drafted the code in `ncaaprotein/` (see [Use of AI](#use-of-ai))
 
 **Please cite**
 
@@ -392,6 +420,26 @@ GROMACS tools the toolbox also runs (solvation and insertion, a net-charge notic
 The toolbox also uses AmberTools (antechamber, parmchk2, tleap), acpype, the ff19SB,
 GAFF2 and OPC models, PyMOL and MDAnalysis; these print no reference of their own, so cite them as their
 documentation asks.
+
+## Use of AI
+
+- **The toolbox uses no AI model.** Nothing is trained or called when it runs: every result comes from GROMACS,
+  AmberTools, acpype and the analysis scripts in `ncaaprotein/scripts/`.
+- **The code was written with an AI assistant.** The code and documentation were drafted with Claude Code,
+  Anthropic's coding assistant, running the model Claude Opus 5.5. It worked from the team's own step-by-step
+  protocol, the one first run by hand for the worked example. Harvey Fung directed the work, chose the methods and
+  defaults, and ran the tests.
+- **How it was checked.** The toolbox was compared with the study's runs, which were set up by hand:
+  - the CYL topology the toolbox builds matches the hand-built one term for term, except for one improper
+    dihedral whose outer atoms are listed in a different order;
+  - the free-NCAA analysis (step 29), run on the study's 200 ns free run, reproduces the team's original analysis;
+  - all 29 steps were run end to end, on a GPU, on a three-chain test system.
+- **Limitations.** These checks cover one protein family and one NCAA in full. Code written with AI assistance can
+  hold errors that the checks did not reach, so read the checks each stage reports (see
+  [Checks that hold a run](#checks-that-hold-a-run)) and the [Scope and limits](#scope-and-limits).
+- **AlphaFold** (through AlphaFold Server) was used in the worked example only, to fold the cap construct before it
+  was docked on the fibril. It is not part of the toolbox; see
+  [the example's design notes](examples/hets_cyl/protein_relax/fibril_design/README.md).
 
 ## License
 This repository is licensed under the [Apache License 2.0](LICENSE). You are free to use, modify and distribute
