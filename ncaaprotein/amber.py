@@ -1,4 +1,4 @@
-"""AmberTools side: the tleap build with its two passes, acpype and its known repairs, restraint and index files."""
+"""AmberTools side: the tleap build with its two passes, acpype, restraint and index files."""
 import re
 import shutil
 from pathlib import Path
@@ -63,27 +63,33 @@ def tleap_build(ctx, d, name, out, body, unit, box, shape="Box", salt=0.15, pair
     return charge, waters, pairs
 
 
+ACPYPE_MIN = (2026, 10, 15)
+
+
+def check_acpype(ctx):
+    """acpype before 2026.10.8 writes a truncated-octahedron box mirrored, and before 2026.10.15 lists alternating
+    Na+/Cl- as two blocks: the first passes grompp silently, so an older acpype is refused."""
+    out = ctx.sh("acpype --version", log="acpype_version", check=False)
+    m = re.search(r"v\. (\d{4})\.(\d+)\.(\d+)", out)
+    if not m:
+        raise StageError("could not read the acpype version (acpype --version): is acpype installed?")
+    v = tuple(int(x) for x in m.groups())
+    if v < ACPYPE_MIN:
+        raise StageError(f"acpype {'.'.join(map(str, v))} is too old: {'.'.join(map(str, ACPYPE_MIN))} or newer is needed. "
+                         "Older versions mirror the truncated-octahedron box and mis-order alternating ions. "
+                         f"Update it with: conda install -c conda-forge acpype={'.'.join(map(str, ACPYPE_MIN))}")
+    return v
+
+
 def acpype(ctx, d, out):
-    """Amber -> GROMACS, then the ion-order repair acpype still needs."""
+    """Amber -> GROMACS."""
     d = Path(d)
     g = d / f"{out}.amb2gmx"
     if not (g / f"{out}_GMX.top").exists():
+        v = check_acpype(ctx)
         ctx.sh(f"acpype -p {out}.prmtop -x {out}.inpcrd -b {out}", cwd=d, log="acpype")
-    ctx.grab(ctx.script("fix_ion_order.py", [f"{out}_GMX.top", f"{out}_GMX.gro"], cwd=g), re.compile("ions|molecules"))
+        ctx.note(f"acpype {'.'.join(map(str, v))}: {out}_GMX.top, {out}_GMX.gro")
     return g
-
-
-def fix_octahedron_box(gro):
-    """acpype writes the truncated-octahedron box mirrored: negate box elements 6 and 9."""
-    gro = Path(gro)
-    shutil.copy(gro, str(gro) + ".orig")
-    lines = gro.read_text().rstrip("\n").split("\n")
-    v = [float(x) for x in lines[-1].split()]
-    if len(v) != 9:
-        raise StageError(f"{gro.name}: the box line has {len(v)} numbers, expected 9 for a truncated octahedron")
-    v[5], v[8] = -v[5], -v[8]
-    lines[-1] = "".join(f"{x:10.5f}" for x in v)
-    gro.write_text("\n".join(lines) + "\n")
 
 
 def first_molecule(top):

@@ -78,7 +78,7 @@ def free_build(ctx):
         ctx.end()
 
     info = json.loads((d / "build_info.json").read_text())
-    if ctx.begin("s25", "25 · Convert with acpype, then its repairs"):
+    if ctx.begin("s25", "25 · Convert to GROMACS with acpype"):
         g0 = build_gromacs(ctx, d, out, info["waters"])
         if "protein_nm" in info:
             for l in built([float(x) for x in gmxmd.box_of(g0 / f"{out}_GMX.gro")[:3]], info["protein_nm"], "the protein"):

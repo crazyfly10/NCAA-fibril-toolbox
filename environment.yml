@@ -10,7 +10,7 @@ dependencies:
   - python=3.12.13
   - gromacs=2026.3=mpi_openmpi_cuda*      # gmx_mpi, with CUDA
   - ambertools=24.8
-  - acpype=2026.9.4
+  - acpype=2026.10.15
   - pymol-open-source=3.1.0
   - numpy=2.5.1
   - networkx=3.6.1

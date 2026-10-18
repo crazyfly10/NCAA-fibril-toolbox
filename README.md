@@ -1,5 +1,7 @@
 # NCAA-protein-toolbox
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23420371.svg)](https://doi.org/10.5281/zenodo.23420371)
+
 This toolbox is designed to allow users to run full atom trajectories of custom NCAAs attached to custom proteins. The aim
 is to generate trajectories that allow MS-IBI to sample bonded and non-bonded interactions for a coarse-grained model.
 
@@ -34,7 +36,7 @@ What it takes care of:
 - **Optional stages.** Bring an already relaxed structure and start further down.
 - **Box size from the structure**: every stage that makes a box works its size out by default, so that the protein
   and whatever is attached to it cannot touch their own periodic images. Give a number instead to set it yourself.
-- **The bookkeeping**: ion counts for 0.15 M, acpype's known repairs, restraint and index files, checks after every
+- **The bookkeeping**: ion counts for 0.15 M, restraint and index files, checks after every
   MD stage (with the expected density worked out from what is in the box), a log of every command, and a report
   per stage.
 
@@ -50,7 +52,7 @@ them with their settings taken from the config.
 |---|---|---|
 | GROMACS | 2026.3 or newer (`gmx_mpi`) | every MD step; ships ff19SB as `amber19sb.ff` with OPC |
 | AmberTools | conda-forge | antechamber, prepgen, parmchk2, tleap, ParmEd |
-| acpype | 2026.9.3 or newer | Amber → GROMACS with 4-site OPC and the CMAP terms |
+| acpype | 2026.10.15 or newer | Amber → GROMACS with 4-site OPC, the CMAP terms, the ion order and the truncated-octahedron box; older versions are refused |
 | PyMOL | 2 or 3, callable as `pymol` | placing the residue on the protein in `linked-build` (run headless) |
 | Python | 3.11 or newer | with NumPy, NetworkX, ParmEd, MDAnalysis, matplotlib |
 
@@ -68,7 +70,7 @@ python -m ncaaprotein -h
 ```
 
 [environment.yml](environment.yml) installs everything in the table above, from conda-forge, at the versions the
-toolbox was tested with: GROMACS 2026.3 (built with CUDA and OpenMPI), AmberTools 24.8, acpype 2026.9.4, PyMOL
+toolbox was tested with: GROMACS 2026.3 (built with CUDA and OpenMPI), AmberTools 24.8, acpype 2026.10.15, PyMOL
 3.1.0, Python 3.12.13, NumPy 2.5.1, NetworkX 3.6.1, ParmEd 4.3.1, MDAnalysis 2.10.0 and matplotlib 3.10.9.
 [conda-linux-64.lock](conda-linux-64.lock) lists every package of that environment at its exact build, for an
 identical copy on Linux x86-64:
@@ -170,9 +172,11 @@ In your copy of the config, set:
   ```
 
   `chains` takes whole chains (`"G"`) or stretches of one (`"G:226-282"`, residue numbers as in your structure), any
-  number of them. `atoms` is a list of atom names, or `"heavy"` (every atom but hydrogens) or `"all"`. For anything
-  else, give the group as a `gmx select` expression instead (see the GROMACS documentation of `gmx select`, or of
-  `gmx make_ndx` for the same groups built interactively):
+  number of them. A structure without chain IDs, such as a frame written by GROMACS, has its chains lettered A, B,
+  C, ... in file order, a new chain starting where the residue number drops or at a TER record. `atoms` is a
+  list of atom names, or `"heavy"` (every atom but hydrogens) or `"all"`. For anything else, give the group as a
+  `gmx select` expression instead (see the GROMACS documentation of `gmx select`, or of `gmx make_ndx` for the same
+  groups built interactively):
 
   ```toml
   restrain = {select = "resnr 226 to 282 and name CA", name = "core", fc = 1000}
@@ -368,7 +372,8 @@ stage by stage. The example's [config.toml](examples/hets_cyl/config.toml) runs 
 hold the study's own outputs, named as the toolbox writes them, so a new run can be compared with them file by file.
 
 ## Data and large files
-This repository holds source code and small input files. Trajectories are not stored here.
+This repository holds source code and small input files. Trajectories are not stored here: those of the worked
+example, with every run's input, topology, energy and log files, are on Zenodo, https://doi.org/10.5281/zenodo.23420371.
 
 ## Contributing
 Pull requests are welcome. Every change is reviewed by the maintainer, Harvey Fung, who decides whether it is
@@ -384,22 +389,41 @@ compare the residue's `.prepin` and `frcmod` files in `work/ncaa/`. It needs no 
 - Harvey Fung (Team Imperial College, iGEM 2026)
 - Claude Code (Anthropic's AI coding assistant), which drafted the code in `ncaaprotein/` (see [Use of AI](#use-of-ai))
 
-**Please cite**
+## Citing
 
-The toolbox drives other people's programs. These are the references those programs ask to be cited, as they
-print them when the pipeline runs.
+### Citing the toolbox
 
-GROMACS, printed in every `mdrun` log:
+There is no paper on the toolbox yet. Cite the repository:
+
+Team Imperial College, iGEM 2026 (H. Fung). NCAA-protein-toolbox, version 0.1.0 (2026).
+https://gitlab.igem.org/2026/software/imperial-college/full-atom-trajectory-for-msibi
+
+### Citing the data
+
+The trajectories of the worked example are a separate dataset on Zenodo:
+
+H. Fung (Team Imperial College, iGEM 2026). Imperial College 2026: reGELerate: all-atom MD trajectories of a
+capped HET-s fibril with attached and free Cys–maleimide–PEG12–biotin [Data set]. Zenodo (2026).
+https://doi.org/10.5281/zenodo.23420371
+
+### Citing what the toolbox uses
+
+The toolbox drives other people's programs, force fields and libraries; please cite them too. References 1–16 are
+the ones the programs print when the pipeline runs (GROMACS in its logs, sqm in `sqm.out`); 17–38 are the ones the
+force fields, tools and libraries ask for in their documentation, or the papers behind a method the toolbox uses.
+
+**GROMACS**, which runs every simulation (steps 1–4, 12, 18–20, 22–28):
 
 1. M. J. Abraham, T. Murtola, R. Schulz, S. Páll, J. C. Smith, B. Hess, E. Lindahl. GROMACS: High performance molecular simulations through multi-level parallelism from laptops to supercomputers. *SoftwareX* 1–2, 19–25 (2015). doi:10.1016/j.softx.2015.06.001
-2. S. Páll, M. J. Abraham, C. Kutzner, B. Hess, E. Lindahl. Tackling exascale software challenges in molecular dynamics simulations with GROMACS. In S. Markidis, E. Laure (eds.), *Solving Software Challenges for Exascale*, Lecture Notes in Computer Science, 3–27 (2015). doi:10.1007/978-3-319-15976-8_1
+2. S. Páll, M. J. Abraham, C. Kutzner, B. Hess, E. Lindahl. Tackling exascale software challenges in molecular dynamics simulations with GROMACS. In S. Markidis, E. Laure (eds.), *Solving Software Challenges for Exascale*, Lecture Notes in Computer Science 8759, 3–27 (2015). doi:10.1007/978-3-319-15976-8_1
 3. S. Pronk, S. Páll, R. Schulz, P. Larsson, P. Bjelkmar, R. Apostolov, M. R. Shirts, J. C. Smith, P. M. Kasson, D. van der Spoel, B. Hess, E. Lindahl. GROMACS 4.5: a high-throughput and highly parallel open source molecular simulation toolkit. *Bioinformatics* 29, 845–854 (2013). doi:10.1093/bioinformatics/btt055
 4. B. Hess, C. Kutzner, D. van der Spoel, E. Lindahl. GROMACS 4: Algorithms for highly efficient, load-balanced, and scalable molecular simulation. *J. Chem. Theory Comput.* 4, 435–447 (2008). doi:10.1021/ct700301q
 5. D. van der Spoel, E. Lindahl, B. Hess, G. Groenhof, A. E. Mark, H. J. C. Berendsen. GROMACS: Fast, flexible and free. *J. Comput. Chem.* 26, 1701–1718 (2005). doi:10.1002/jcc.20291
 6. E. Lindahl, B. Hess, D. van der Spoel. GROMACS 3.0: A package for molecular simulation and trajectory analysis. *J. Mol. Model.* 7, 306–317 (2001). doi:10.1007/s008940100045
 7. H. J. C. Berendsen, D. van der Spoel, R. van Drunen. GROMACS: A message-passing parallel molecular dynamics implementation. *Comput. Phys. Commun.* 91, 43–56 (1995). doi:10.1016/0010-4655(95)00042-E
 
-GROMACS, for the algorithms the runs use:
+**The methods `gmx mdrun` uses**: PME electrostatics and SETTLE (rigid water) in every run, LINCS (bonds to
+hydrogen) and the V-rescale thermostat in NVT, NPT and production, the C-rescale barostat in NPT and production:
 
 8. U. Essmann, L. Perera, M. L. Berkowitz, T. Darden, H. Lee, L. G. Pedersen. A smooth particle mesh Ewald method. *J. Chem. Phys.* 103, 8577–8593 (1995). doi:10.1063/1.470117
 9. S. Miyamoto, P. A. Kollman. SETTLE: An analytical version of the SHAKE and RATTLE algorithm for rigid water models. *J. Comput. Chem.* 13, 952–962 (1992). doi:10.1002/jcc.540130805
@@ -407,19 +431,77 @@ GROMACS, for the algorithms the runs use:
 11. G. Bussi, D. Donadio, M. Parrinello. Canonical sampling through velocity rescaling. *J. Chem. Phys.* 126, 014101 (2007). doi:10.1063/1.2408420
 12. M. Bernetti, G. Bussi. Pressure control using stochastic cell rescaling. *J. Chem. Phys.* 153, 114107 (2020). doi:10.1063/5.0020514
 
-sqm (AmberTools), which computes the AM1 charges in `ncaa-param`:
+**Other GROMACS tools**: the van der Waals radii used by `gmx solvate`, `insert-molecules`, `editconf` and `select`
+(steps 1, 17, 22, 23, 26); the net-charge note `gmx grompp` prints for the systems built in tleap, which carry a tiny
+rounding charge; and `gmx hbond` (step 4, when `[relax] hbond` is set):
 
-13. R. C. Walker, M. F. Crowley, D. A. Case. The implementation of a fast and accurate QM/MM potential method in Amber. *J. Comput. Chem.* 29, 1019–1031 (2008). doi:10.1002/jcc.20857
+13. A. Bondi. van der Waals Volumes and Radii. *J. Phys. Chem.* 68, 441–451 (1964). doi:10.1021/j100785a001
+14. J. S. Hub, B. L. de Groot, H. Grubmüller, G. Groenhof. Quantifying Artifacts in Ewald Simulations of Inhomogeneous Systems with a Net Charge. *J. Chem. Theory Comput.* 10, 381–390 (2014). doi:10.1021/ct400626b
+15. S. Gorelov, A. Titov, O. Tolicheva, A. Konevega, A. Shvetsov. Determination of Hydrogen Bonds in GROMACS: A New Implementation to Overcome Memory Limitation. *J. Chem. Inf. Model.* 64, 6241–6246 (2024). doi:10.1021/acs.jcim.3c02087
 
-GROMACS tools the toolbox also runs (solvation and insertion, a net-charge notice, `gmx hbond`), given as printed:
+**sqm**, which computes the AM1 charges for AM1-BCC (step 5):
 
-14. A. Bondi. van der Waals Volumes and Radii. *J. Phys. Chem.* (1964). doi:10.1021/j100785a001
-15. J. S. Hub, B. L. de Groot, H. Grubmüller, G. Groenhof. Quantifying Artifacts in Ewald Simulations of Inhomogeneous Systems with a Net Charge. *J. Chem. Theory Comput.* (2014). doi:10.1021/ct400626b
-16. S. Gorelov, A. Titov, O. Tolicheva, A. Konevega, A. Shvetsov. Determination of Hydrogen Bonds in GROMACS: A New Implementation to Overcome Memory Limitation. *J. Chem. Inf. Model.* (2024). doi:10.1021/acs.jcim.3c02087
+16. R. C. Walker, M. F. Crowley, D. A. Case. The implementation of a fast and accurate QM/MM potential method in Amber. *J. Comput. Chem.* 29, 1019–1031 (2008). doi:10.1002/jcc.20857
 
-The toolbox also uses AmberTools (antechamber, parmchk2, tleap), acpype, the ff19SB,
-GAFF2 and OPC models, PyMOL and MDAnalysis; these print no reference of their own, so cite them as their
-documentation asks.
+**AmberTools** (antechamber, prepgen, parmchk2, tleap), which builds the NCAA's parameters and every system (steps
+5–12, 15, 24), as Amber's citation page asks:
+
+17. D. A. Case, H. M. Aktulga, K. Belfon, et al. AmberTools. *J. Chem. Inf. Model.* 63, 6183–6191 (2023). doi:10.1021/acs.jcim.3c01153
+
+**Antechamber, GAFF and GAFF2**, the atom types of the NCAA (step 5), as acpype's documentation asks. GAFF2 has no
+paper of its own and is cited with GAFF:
+
+18. J. Wang, W. Wang, P. A. Kollman, D. A. Case. Automatic atom type and bond type perception in molecular mechanical calculations. *J. Mol. Graph. Model.* 25, 247–260 (2006). doi:10.1016/j.jmgm.2005.12.005
+19. J. Wang, R. M. Wolf, J. W. Caldwell, P. A. Kollman, D. A. Case. Development and testing of a general amber force field. *J. Comput. Chem.* 25, 1157–1174 (2004). doi:10.1002/jcc.20035
+
+**AM1-BCC**, the charges of the NCAA (step 5):
+
+20. A. Jakalian, B. L. Bush, D. B. Jack, C. I. Bayly. Fast, efficient generation of high-quality atomic charges. AM1-BCC model: I. Method. *J. Comput. Chem.* 21, 132–146 (2000). doi:10.1002/(SICI)1096-987X(20000130)21:2<132::AID-JCC5>3.0.CO;2-P
+21. A. Jakalian, D. B. Jack, C. I. Bayly. Fast, efficient generation of high-quality atomic charges. AM1-BCC model: II. Parameterization and validation. *J. Comput. Chem.* 23, 1623–1641 (2002). doi:10.1002/jcc.10128
+
+**ff19SB**, the protein force field, and its GROMACS port (`amber19sb.ff`, used by `pdb2gmx` in step 1), whose
+authors ask to be cited:
+
+22. C. Tian, K. Kasavajhala, K. A. A. Belfon, L. Raguette, H. Huang, A. N. Migues, J. Bickel, Y. Wang, J. Pincay, Q. Wu, C. Simmerling. ff19SB: Amino-Acid-Specific Protein Backbone Parameters Trained against Quantum Mechanics Energy Surfaces in Solution. *J. Chem. Theory Comput.* 16, 528–552 (2020). doi:10.1021/acs.jctc.9b00591
+23. V. Miletić, M. Wieczór, C. Simmerling, M. Rampp, B. L. de Groot, C. Kutzner, V. Gapsys. Force Fields and Simulation Engines: Lessons Learned from Porting Amber ff14SB and ff19SB to GROMACS. *ChemRxiv* (2026), preprint. doi:10.26434/chemrxiv.15006112/v1
+
+**OPC water** and its **Li/Merz Na⁺/Cl⁻ parameters**, in every system:
+
+24. S. Izadi, R. Anandakrishnan, A. V. Onufriev. Building Water Models: A Different Approach. *J. Phys. Chem. Lett.* 5, 3863–3871 (2014). doi:10.1021/jz501780a
+25. A. Sengupta, Z. Li, L. F. Song, P. Li, K. M. Merz Jr. Parameterization of Monovalent Ions for the OPC3, OPC, TIP3P-FB, and TIP4P-FB Water Models. *J. Chem. Inf. Model.* 61, 869–880 (2021). doi:10.1021/acs.jcim.0c01390
+
+**acpype**, which converts every Amber system to GROMACS (steps 12, 16, 25):
+
+26. A. W. Sousa da Silva, W. F. Vranken. ACPYPE – AnteChamber PYthon Parser interfacE. *BMC Res. Notes* 5, 367 (2012). doi:10.1186/1756-0500-5-367
+
+**Hydrogen mass repartitioning**, which allows the 4 fs time step, and the solute temperature at that time step,
+which the NVT and NPT checks report (see [Checks that hold a run](#checks-that-hold-a-run)):
+
+27. K. A. Feenstra, B. Hess, H. J. C. Berendsen. Improving efficiency of large time-scale molecular dynamics simulations of hydrogen-rich systems. *J. Comput. Chem.* 20, 786–798 (1999). doi:10.1002/(SICI)1096-987X(199906)20:8<786::AID-JCC5>3.0.CO;2-B
+28. C. W. Hopkins, S. Le Grand, R. C. Walker, A. E. Roitberg. Long-Time-Step Molecular Dynamics through Hydrogen Mass Repartitioning. *J. Chem. Theory Comput.* 11, 1864–1874 (2015). doi:10.1021/ct5010406
+29. M. P. Eastwood, K. A. Stafford, R. A. Lippert, M. Ø. Jensen, P. Maragakis, C. Predescu, R. O. Dror, D. E. Shaw. Equipartition and the Calculation of Temperature in Biomolecular Simulations. *J. Chem. Theory Comput.* 6, 2045–2058 (2010). doi:10.1021/ct9002916
+30. J. Jung, C. Kobayashi, Y. Sugita. Optimal Temperature Evaluation in Molecular Dynamics Simulations with a Large Time Step. *J. Chem. Theory Comput.* 15, 84–94 (2019). doi:10.1021/acs.jctc.8b00874
+
+**Automated equilibration detection**, the method step 21 uses to find from when the linked run can be used:
+
+31. J. D. Chodera. A Simple Method for Automated Equilibration Detection in Molecular Simulations. *J. Chem. Theory Comput.* 12, 1799–1805 (2016). doi:10.1021/acs.jctc.5b00784
+
+**PyMOL**, which places the NCAA on the protein (step 13), cited as its developers ask:
+
+32. The PyMOL Molecular Graphics System, Version 3.1, Schrödinger, LLC.
+
+**MDAnalysis**, which reads the trajectories in the analyses (steps 3, 12, 21, 29):
+
+33. R. J. Gowers, M. Linke, J. Barnoud, T. J. E. Reddy, M. N. Melo, S. L. Seyler, J. Domański, D. L. Dotson, S. Buchoux, I. M. Kenney, O. Beckstein. MDAnalysis: A Python Package for the Rapid Analysis of Molecular Dynamics Simulations. In *Proceedings of the 15th Python in Science Conference*, 98–105 (2016). doi:10.25080/Majora-629e541a-00e
+34. N. Michaud-Agrawal, E. J. Denning, T. B. Woolf, O. Beckstein. MDAnalysis: A toolkit for the analysis of molecular dynamics simulations. *J. Comput. Chem.* 32, 2319–2327 (2011). doi:10.1002/jcc.21787
+
+**ParmEd** (steps 6 and 11), **NetworkX** (the molecule's bond graph, step 6), **SciPy** (the box check, step 1) and
+**Matplotlib** (every figure):
+
+35. M. R. Shirts, C. Klein, J. M. Swails, J. Yin, M. K. Gilson, D. L. Mobley, D. A. Case, E. D. Zhong. Lessons learned from comparing molecular dynamics engines on the SAMPL5 dataset. *J. Comput.-Aided Mol. Des.* 31, 147–161 (2017). doi:10.1007/s10822-016-9977-1
+36. A. A. Hagberg, D. A. Schult, P. J. Swart. Exploring Network Structure, Dynamics, and Function using NetworkX. In *Proceedings of the 7th Python in Science Conference (SciPy2008)*, 11–15 (2008). doi:10.25080/TCWV9851
+37. P. Virtanen, R. Gommers, T. E. Oliphant, et al. SciPy 1.0: fundamental algorithms for scientific computing in Python. *Nat. Methods* 17, 261–272 (2020). doi:10.1038/s41592-019-0686-2
+38. J. D. Hunter. Matplotlib: A 2D Graphics Environment. *Comput. Sci. Eng.* 9, 90–95 (2007). doi:10.1109/MCSE.2007.55
 
 ## Use of AI
 

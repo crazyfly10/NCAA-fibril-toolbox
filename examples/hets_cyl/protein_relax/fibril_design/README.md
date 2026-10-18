@@ -103,3 +103,15 @@ takes over:
 cd ../..
 python -m ncaaprotein protein-prepare protein-run config.toml
 ```
+
+## References
+
+The template structure is PDB entry **2KJ3**; the PDB asks that an entry be cited by its ID and its publication:
+
+1. H. Van Melckebeke, C. Wasmer, A. Lange, E. AB, A. Loquet, A. Böckmann, B. H. Meier. Atomic-Resolution Three-Dimensional Structure of HET-s(218–289) Amyloid Fibrils by Solid-State NMR Spectroscopy. *J. Am. Chem. Soc.* 132, 13765–13775 (2010). doi:10.1021/ja104213j
+
+The cap was folded with AlphaFold Server, whose developers ask that work using its outputs cite:
+
+2. J. Abramson, J. Adler, J. Dunger, et al. Accurate structure prediction of biomolecular interactions with AlphaFold 3. *Nature* 630, 493–500 (2024). doi:10.1038/s41586-024-07487-w
+
+The design steps run in PyMOL: see the toolbox's [README](../../../../README.md#citing-what-the-toolbox-uses) for how to cite it.

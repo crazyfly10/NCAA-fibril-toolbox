@@ -11,6 +11,7 @@ from pathlib import Path
 PKG = Path(__file__).resolve().parent
 SCRIPTS = PKG / "scripts"
 MDP = PKG / "mdp"
+CHAIN_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"     # for structures without chain IDs
 MDP_USER = None        # [project] mdp_dir: a folder of your own mdp files, used in place of the package's where present
 _MDP_SAID = set()
 
@@ -266,7 +267,8 @@ def pdb_atoms(path):
 
 def pdb_chains(path):
     """Chains of a PDB in file order: [(chain id, [resid, ...]), ...]. A new chain starts where the chain ID
-    changes, at a TER, or where the residue number drops."""
+    changes, at a TER, or where the residue number drops. A structure without any chain IDs (such as a frame written
+    by GROMACS) has its chains lettered A, B, C, ... in file order."""
     chains, prev, ter = [], None, True
     for l in open(path):
         if l.startswith("TER"):
@@ -280,6 +282,8 @@ def pdb_chains(path):
         if not chains[-1][1] or chains[-1][1][-1] != resi:
             chains[-1][1].append(resi)
         prev, ter = (ch, resi), False
+    if chains and all(c == " " for c, _ in chains):
+        chains = [(CHAIN_LETTERS[i], r) for i, (_, r) in enumerate(chains)]
     return chains
 
 

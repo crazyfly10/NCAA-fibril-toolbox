@@ -21,7 +21,8 @@ For a step-by-step guide to producing all of it, the trajectories included, see 
 
 Each stage folder has the minimisation, NVT and NPT checks (`potential.xvg`, `nvt.xvg`, `npt.xvg`, their `.csv` and
 `.png`), the GROMACS logs and energy files, the structures that start and end each run, and the analysis results.
-The trajectories are not included: they are several GB per run.
+The trajectories are not included: they are several GB per run. They are on Zenodo, https://doi.org/10.5281/zenodo.23420371, with
+every run's input, topology, energy and log files.
 
 ## Running it
 

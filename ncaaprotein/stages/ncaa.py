@@ -222,11 +222,8 @@ def ncaa_relax(ctx):
                           r.get("salt", n.get("salt", 0.15)), r.get("ion_pairs"))
         ctx.end()
 
-    if ctx.begin("s12b", "12 · acpype, ion order and the mirrored octahedron box"):
+    if ctx.begin("s12b", "12 · Convert to GROMACS with acpype"):
         amber.acpype(ctx, d, out)
-        if shape == "Oct":
-            amber.fix_octahedron_box(g / f"{out}_GMX.gro")
-            ctx.note("box elements 6 and 9 negated (acpype writes the truncated octahedron mirrored)")
         ctx.end()
 
     top, gro = f"{out}_GMX.top", f"{out}_GMX.gro"

@@ -83,13 +83,13 @@ def prep_for_tleap(ctx, d, src, dst):
 
 
 def build_gromacs(ctx, d, out, waters):
-    """acpype and its repairs, shared by the linked and the free-NCAA builds."""
+    """acpype and the checks on its output, shared by the linked and the free-NCAA builds."""
     name = ctx.cfg["ncaa"]["name"]
     g = amber.acpype(ctx, d, out)
     top = (g / f"{out}_GMX.top").read_text()
     mol, natoms, nres = amber.first_molecule(g / f"{out}_GMX.top")
     if f"N-{name}" not in top:
-        raise StageError(f"{out}_GMX.top has no CMAP type for {name}: is acpype 2026.9.3 or newer, and was frcmod.ff19SB_{name} loaded?")
+        raise StageError(f"{out}_GMX.top has no CMAP type for {name}: was frcmod.ff19SB_{name} loaded?")
     ncmap = len(re.findall(r"^\s*\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+1\s*$", top.split("[ cmap ]")[-1].split("[ ")[0], re.M)) if "[ cmap ]" in top else 0
     ctx.note(f"{out}_GMX.top: first molecule '{mol}'; CMAP type N-{name} defined; {ncmap} CMAP terms in the solute")
     if waters + nres > 99999:
