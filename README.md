@@ -1,8 +1,11 @@
-# NCAA-protein-toolbox
+# NCAAP
+
+**N**on-**C**anonical **A**mino **A**cids on **P**roteins: the toolbox of NCAAP-MDF (Non-Canonical Amino Acids on
+Proteins, Molecular Dynamics Framework)
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23420371.svg)](https://doi.org/10.5281/zenodo.23420371)
 
-This toolbox is designed to allow users to run full atom trajectories of custom NCAAs attached to custom proteins. The aim
+NCAAP is designed to allow users to run full atom trajectories of custom NCAAs attached to custom proteins. The aim
 is to generate trajectories that allow MS-IBI to sample bonded and non-bonded interactions for a coarse-grained model.
 
 It is for researchers and iGEM teams who work with a protein or protein assembly carrying a synthetic side chain and
@@ -395,7 +398,8 @@ compare the residue's `.prepin` and `frcmod` files in `work/ncaa/`. It needs no 
 
 There is no paper on the toolbox yet. Cite the repository:
 
-Team Imperial College, iGEM 2026 (H. Fung). NCAA-protein-toolbox, version 0.1.0 (2026).
+Team Imperial College, iGEM 2026 (H. Fung). NCAAP: Non-Canonical Amino Acids on Proteins (the toolbox of
+NCAAP-MDF), version 0.1.0 (2026).
 https://gitlab.igem.org/2026/software/imperial-college/full-atom-trajectory-for-msibi
 
 ### Citing the data

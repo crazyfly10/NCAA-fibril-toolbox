@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ncaaprotein"
 version = "0.1.0"
-description = "All-atom trajectories of a protein carrying a non-canonical amino acid (ff19SB / GAFF2 / OPC, GROMACS)"
+description = "NCAAP (Non-Canonical Amino Acids on Proteins), the toolbox of NCAAP-MDF: all-atom trajectories of a protein carrying a non-canonical amino acid (ff19SB / GAFF2 / OPC, GROMACS)"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "Apache-2.0"}
