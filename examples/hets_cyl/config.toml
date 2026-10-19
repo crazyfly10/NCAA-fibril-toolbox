@@ -68,8 +68,8 @@ mol2 = "ncaa/12EO_linker.mol2"    # drawn capped: ACE-X-NME
 net_charge = 0
 parent = "CYX"                       # the canonical residue it derives from: gives the ff19SB names, types, charges
 parent_atoms = ["CB", "SG"]          # side-chain atoms shared with the parent (default: as many as match)
+charge_method = "bcc"                # AM1-BCC, as in the study's runs. The default is "abcg2"; config_template.toml lists the others
 # The settings below are the defaults. Uncomment one to change it.
-# charge_method = "bcc"              # antechamber -c: "bcc" = AM1-BCC. Other antechamber methods ("gas", "rc" ...) are passed on as given
 # sqm_keywords = "qm_theory='AM1', grms_tol=0.0005, scfconv=1.d-10, ndiis_attempts=700, maxcyc=0"    # antechamber -ek
 # set_backbone_charges = true        # ff19SB charges on the backbone and caps; false keeps the computed charges everywhere
 # cmap = "generic"                   # "generic": the map ff19SB uses for LEU, CYX and ten others (the generic map);

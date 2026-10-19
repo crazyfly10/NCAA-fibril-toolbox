@@ -58,8 +58,15 @@ net_charge = 0
 parent = "<CYX>"                     # the canonical residue it derives from, as named in ff19SB (CYX, LYS ...):
                                      # gives the ff19SB names, types and charges
 # parent_atoms = ["CB", "SG"]        # side-chain atoms shared with the parent (default: as many as match)
-# charge_method = "bcc"              # antechamber -c: "bcc" = AM1-BCC. Other antechamber methods ("gas", "rc" ...) are passed on
-# sqm_keywords = "qm_theory='AM1', grms_tol=0.0005, scfconv=1.d-10, ndiis_attempts=700, maxcyc=0"    # antechamber -ek
+# charge_method = "abcg2"            # antechamber -c, the charges of the residue: "abcg2" (ABCG2, made for GAFF2),
+                                     # "bcc" (AM1-BCC), "mul" (Mulliken, AM1), "gas" (Gasteiger), "rc" (read from
+                                     # charge_file), "resp" or "esp" (fitted to your own QM run, given as qm_output)
+# charge_file = "<charges.crg>"      # for "rc": one charge per atom, in the order of the mol2 (as antechamber -c wc writes)
+# qm_output = "<capped.log>"         # for "resp"/"esp": Gaussian output (.log/.out/.gesp) or GAMESS .dat of the capped
+                                     # molecule, atoms in the order of the mol2. The names still come from the mol2
+# qm_format = "gout"                 # only if the file ending does not say: "gout", "gesp" or "gamess"
+# sqm_keywords = "qm_theory='AM1', grms_tol=0.0005, scfconv=1.d-10, ndiis_attempts=700, maxcyc=0"    # antechamber -ek,
+                                     # for "abcg2", "bcc" and "mul" (the methods that run sqm)
 # set_backbone_charges = true        # ff19SB charges on the backbone and caps; false keeps the computed charges everywhere
 # cmap = "generic"                   # "generic": the map ff19SB uses for LEU, CYX and ten others;
                                      # "parent": the map ff19SB gives the parent

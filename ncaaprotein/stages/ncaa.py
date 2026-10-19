@@ -10,6 +10,50 @@ from ..core import StageError, nsteps_for, stage, temp_changes, write_mdp
 from ..ncaa_map import MapError, retype, write_mc
 
 SQM = "qm_theory='AM1', grms_tol=0.0005, scfconv=1.d-10, ndiis_attempts=700, maxcyc=0"
+CHARGE_METHODS = {"abcg2": "ABCG2", "bcc": "AM1-BCC", "mul": "Mulliken (AM1)", "gas": "Gasteiger",
+                  "resp": "RESP", "esp": "ESP (Merz-Kollman)", "rc": "read-in"}      # the antechamber -c methods
+SQM_METHODS = ("abcg2", "bcc", "mul")                   # antechamber runs sqm for these, with sqm_keywords
+QM_FILE = ("resp", "esp")                               # these fit charges to a QM run done beforehand
+QM_FORMATS = {".log": "gout", ".out": "gout", ".gesp": "gesp", ".dat": "gamess"}
+NOT_METHODS = {
+    "cm1": "antechamber lists it, but sqm cannot compute CM1 charges and antechamber stops",
+    "cm2": "antechamber lists it, but sqm cannot compute CM2 charges and antechamber stops",
+    "wc": "wc writes charges to a file, it does not compute them",
+    "dc": "dc deletes the charges (all zero)",
+}
+
+
+def charge_method(n):
+    """The [ncaa] charge_method, checked, with the settings it needs."""
+    cm = str(n.get("charge_method", "abcg2")).lower()
+    if cm in NOT_METHODS:
+        raise StageError(f"[ncaa] charge_method = \"{cm}\": {NOT_METHODS[cm]}. Choose one of {', '.join(CHARGE_METHODS)}")
+    if cm not in CHARGE_METHODS:
+        raise StageError(f"[ncaa] charge_method = \"{cm}\" is not an antechamber charge method. "
+                         f"Choose one of {', '.join(CHARGE_METHODS)}")
+    if cm in QM_FILE and not n.get("qm_output"):
+        raise StageError(f"[ncaa] charge_method = \"{cm}\" fits the charges to the electrostatic potential of a QM run: "
+                         "set qm_output to its Gaussian output (.log, .out or .gesp) or GAMESS .dat file, "
+                         "run on the capped molecule with its atoms in the order of the mol2")
+    if cm == "rc" and not n.get("charge_file"):
+        raise StageError("[ncaa] charge_method = \"rc\" reads the charges from a file: set charge_file "
+                         "(one charge per atom in the order of the mol2, as antechamber -c wc writes them)")
+    return cm
+
+
+def read_ac(path):
+    """[(element, charge), ...] of an antechamber .ac file, in atom order (the element read from the GAFF type)."""
+    rows = []
+    for l in open(path):
+        if l.startswith("ATOM"):
+            t = l.split()[-1].lower()
+            rows.append((t[:2] if t[:2] in ("cl", "br") else t[0], float(l[54:64])))
+    return rows
+
+
+def write_charges(path, q):
+    """A charge file antechamber -c rc reads: eight charges a line."""
+    path.write_text("\n".join("".join(f"{c:10.6f}" for c in q[i:i + 8]) for i in range(0, len(q), 8)) + "\n")
 
 
 def need(d, *files, step):
@@ -47,17 +91,51 @@ def ncaa_param(ctx):
     if len(name) != 3 or name in ("CYS", "CYX", "CYM"):
         raise StageError("[ncaa] name must be three characters and not an existing residue name")
 
+    cq_file = d / "charge_choice.txt"
+    cq = str(n.get("charge_method", "abcg2")).lower()
+    old = cq_file.read_text().strip() if cq_file.exists() else "bcc"     # runs from before the setting was saved used bcc
+    if "s5" in ctx.done and old != cq:
+        for k in ("s5", "s6", "s7", "s8", "s9", "s10", "s11"):          # the charges changed: every step after depends on them
+            ctx.done.pop(k, None)
+        ctx.say(f"   [ncaa] charge_method is now \"{cq}\" (was \"{old}\"): steps 5 to 11 are redone; "
+                "rerun ncaa-relax and the stages after it too")
     if ctx.begin("s5", "5 · antechamber with GAFF2 types"):
         src = ctx.input(n.get("mol2") or n["structure"])
         fmt = src.suffix.lstrip(".").lower()                  # mol2, sdf or pdb: antechamber reads all three
         shutil.copy(src, d / f"ncaa.{fmt}")
-        cm = n.get("charge_method", "bcc")                    # antechamber -c: bcc = AM1-BCC, the default
-        ek = f' -ek "{n.get("sqm_keywords", SQM)}"' if cm in ("bcc", "mul") else ""      # only these two run sqm
+        cm = charge_method(n)
+        if cm in QM_FILE:                                     # RESP/ESP: charges from the user's QM run, names from the mol2
+            qm = ctx.input(n["qm_output"])
+            if not qm.exists():
+                raise StageError(f"[ncaa] qm_output: {qm} does not exist")
+            qfmt = n.get("qm_format") or QM_FORMATS.get(qm.suffix.lower())
+            if qfmt not in QM_FORMATS.values():
+                raise StageError(f"[ncaa] qm_format: give one of {', '.join(sorted(set(QM_FORMATS.values())))} for {qm.name}")
+            shutil.copy(qm, d / f"qm{qm.suffix}")
+            ctx.sh(f"antechamber -i qm{qm.suffix} -fi {qfmt} -o qm_charges.ac -fo ac -c {cm} -nc {nc} -pf y", log="antechamber_qm")
+            need(d, "qm_charges.ac", step=5)
+            ctx.sh(f"antechamber -i ncaa.{fmt} -fi {fmt} -o ncaa_order.ac -fo ac -c dc -pf y", log="antechamber_order")
+            need(d, "ncaa_order.ac", step=5)
+            q, el = read_ac(d / "qm_charges.ac"), read_ac(d / "ncaa_order.ac")
+            if [e for e, _ in q] != [e for e, _ in el]:
+                raise StageError(f"{qm.name} does not list the atoms of {src.name} in the same order "
+                                 f"({len(q)} vs {len(el)} atoms): run the QM job on the molecule as drawn in {src.name}")
+            write_charges(d / "charges.crg", [c for _, c in q])
+            opts = "-c rc -cf charges.crg"
+        elif cm == "rc":
+            cf = ctx.input(n["charge_file"])
+            if not cf.exists():
+                raise StageError(f"[ncaa] charge_file: {cf} does not exist")
+            shutil.copy(cf, d / "charges.crg")
+            opts = "-c rc -cf charges.crg"
+        else:
+            opts = f"-c {cm}" + (f' -ek "{n.get("sqm_keywords", SQM)}"' if cm in SQM_METHODS else "")
         ctx.sh(f'antechamber -i ncaa.{fmt} -fi {fmt} -o {name}_capped.ac -fo ac -rn {name} '
-               f'-c {cm} -nc {nc} -at gaff2 -pf y{ek}', log="antechamber")
+               f'-nc {nc} -at gaff2 -pf y {opts}', log="antechamber")
         need(d, f"{name}_capped.ac", step=5)
         k = sum(1 for l in open(d / f"{name}_capped.ac") if l.startswith("ATOM"))
-        ctx.note(f"{name}_capped.ac: {k} atoms, {'AM1-BCC' if cm == 'bcc' else 'antechamber -c ' + cm} charges, net charge {nc}")
+        ctx.note(f"{name}_capped.ac: {k} atoms, {CHARGE_METHODS[cm]} charges, net charge {nc}")
+        cq_file.write_text(cm + "\n")
         ctx.end()
 
     if ctx.begin("s6", "6 · Names, types and charges (found in the bond graph, no atom numbers)"):

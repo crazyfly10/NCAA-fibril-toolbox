@@ -133,6 +133,21 @@ In your copy of the config, set:
 
 - `[ncaa]`: `mol2` (your molecule drawn with an acetyl cap on the N and an N-methyl cap on the C), `name`
   (three characters), `net_charge`, `parent` (the amino acid it derives from, as named in ff19SB: `CYX`, `LYS` …).
+- `charge_method` in `[ncaa]`: how antechamber computes the residue's charges (step 5). Any method antechamber can run
+  on its own is accepted:
+  - `"abcg2"` (the default): ABCG2, the charge model made for GAFF2;
+  - `"bcc"`: AM1-BCC, the older pairing, used by the worked example;
+  - `"mul"`: Mulliken charges from the same AM1 calculation;
+  - `"gas"`: Gasteiger charges, which need no quantum chemistry;
+  - `"rc"`: charges you computed elsewhere, read from `charge_file` (one per atom, in the order of the mol2);
+  - `"resp"` and `"esp"`: fitted to the electrostatic potential of a QM run you did beforehand, given as `qm_output`
+    (a Gaussian `.log`/`.out`/`.gesp` or GAMESS `.dat` of the capped molecule, its atoms in the order of the mol2).
+    The toolbox checks that order, fits the charges with antechamber and puts them on the mol2's atoms.
+
+  `abcg2`, `bcc` and `mul` run sqm with `sqm_keywords`. antechamber also lists `cm1` and `cm2`, but sqm cannot compute
+  them, so the toolbox stops with an explanation, as it does for `wc` and `dc`, which are not charge methods. With
+  `set_backbone_charges = true` (the default) the backbone and caps keep their ff19SB charges whatever the method.
+  Changing `charge_method` redoes steps 5 to 11; rerun `ncaa-relax` and the stages after it too.
 - `[attach] sites`: chain and residue number of each attachment. **You choose these yourself.** The toolbox does not
   look for attachment sites: open your structure in PyMOL (or another viewer), decide which residues the molecule
   should replace, and give their chain letters and residue numbers as they appear in that file. Pick residues whose
@@ -414,7 +429,8 @@ https://doi.org/10.5281/zenodo.23420371
 
 The toolbox drives other people's programs, force fields and libraries; please cite them too. References 1–16 are
 the ones the programs print when the pipeline runs (GROMACS in its logs, sqm in `sqm.out`); 17–38 are the ones the
-force fields, tools and libraries ask for in their documentation, or the papers behind a method the toolbox uses.
+force fields, tools and libraries ask for in their documentation, or the papers behind a method the toolbox uses;
+39–42 are the papers behind the other charge methods `charge_method` can choose.
 
 **GROMACS**, which runs every simulation (steps 1–4, 12, 18–20, 22–28):
 
@@ -443,7 +459,7 @@ rounding charge; and `gmx hbond` (step 4, when `[relax] hbond` is set):
 14. J. S. Hub, B. L. de Groot, H. Grubmüller, G. Groenhof. Quantifying Artifacts in Ewald Simulations of Inhomogeneous Systems with a Net Charge. *J. Chem. Theory Comput.* 10, 381–390 (2014). doi:10.1021/ct400626b
 15. S. Gorelov, A. Titov, O. Tolicheva, A. Konevega, A. Shvetsov. Determination of Hydrogen Bonds in GROMACS: A New Implementation to Overcome Memory Limitation. *J. Chem. Inf. Model.* 64, 6241–6246 (2024). doi:10.1021/acs.jcim.3c02087
 
-**sqm**, which computes the AM1 charges for AM1-BCC (step 5):
+**sqm**, which computes the AM1 charges for ABCG2, AM1-BCC and Mulliken charges (step 5):
 
 16. R. C. Walker, M. F. Crowley, D. A. Case. The implementation of a fast and accurate QM/MM potential method in Amber. *J. Comput. Chem.* 29, 1019–1031 (2008). doi:10.1002/jcc.20857
 
@@ -458,7 +474,7 @@ paper of its own and is cited with GAFF:
 18. J. Wang, W. Wang, P. A. Kollman, D. A. Case. Automatic atom type and bond type perception in molecular mechanical calculations. *J. Mol. Graph. Model.* 25, 247–260 (2006). doi:10.1016/j.jmgm.2005.12.005
 19. J. Wang, R. M. Wolf, J. W. Caldwell, P. A. Kollman, D. A. Case. Development and testing of a general amber force field. *J. Comput. Chem.* 25, 1157–1174 (2004). doi:10.1002/jcc.20035
 
-**AM1-BCC**, the charges of the NCAA (step 5):
+**AM1-BCC**, the charges of the NCAA in the worked example (step 5, `charge_method = "bcc"`):
 
 20. A. Jakalian, B. L. Bush, D. B. Jack, C. I. Bayly. Fast, efficient generation of high-quality atomic charges. AM1-BCC model: I. Method. *J. Comput. Chem.* 21, 132–146 (2000). doi:10.1002/(SICI)1096-987X(20000130)21:2<132::AID-JCC5>3.0.CO;2-P
 21. A. Jakalian, D. B. Jack, C. I. Bayly. Fast, efficient generation of high-quality atomic charges. AM1-BCC model: II. Parameterization and validation. *J. Comput. Chem.* 23, 1623–1641 (2002). doi:10.1002/jcc.10128
@@ -506,6 +522,14 @@ which the NVT and NPT checks report (see [Checks that hold a run](#checks-that-h
 36. A. A. Hagberg, D. A. Schult, P. J. Swart. Exploring Network Structure, Dynamics, and Function using NetworkX. In *Proceedings of the 7th Python in Science Conference (SciPy2008)*, 11–15 (2008). doi:10.25080/TCWV9851
 37. P. Virtanen, R. Gommers, T. E. Oliphant, et al. SciPy 1.0: fundamental algorithms for scientific computing in Python. *Nat. Methods* 17, 261–272 (2020). doi:10.1038/s41592-019-0686-2
 38. J. D. Hunter. Matplotlib: A 2D Graphics Environment. *Comput. Sci. Eng.* 9, 90–95 (2007). doi:10.1109/MCSE.2007.55
+
+**ABCG2** (the default `charge_method`), **Gasteiger** (`"gas"`), **RESP** (`"resp"`) and **ESP** (`"esp"`), the
+other charge methods of step 5; cite the one you use (AM1-BCC is 20–21):
+
+39. X. He, V. H. Man, W. Yang, T.-S. Lee, J. Wang. A fast and high-quality charge model for the next generation general AMBER force field. *J. Chem. Phys.* 153, 114502 (2020). doi:10.1063/5.0019056
+40. J. Gasteiger, M. Marsili. Iterative partial equalization of orbital electronegativity—a rapid access to atomic charges. *Tetrahedron* 36, 3219–3228 (1980). doi:10.1016/0040-4020(80)80168-2
+41. C. I. Bayly, P. Cieplak, W. Cornell, P. A. Kollman. A well-behaved electrostatic potential based method using charge restraints for deriving atomic charges: the RESP model. *J. Phys. Chem.* 97, 10269–10280 (1993). doi:10.1021/j100142a004
+42. U. C. Singh, P. A. Kollman. An approach to computing electrostatic charges for molecules. *J. Comput. Chem.* 5, 129–145 (1984). doi:10.1002/jcc.540050204
 
 ## Use of AI
 

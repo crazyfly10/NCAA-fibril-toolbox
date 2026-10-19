@@ -10,7 +10,8 @@ molecule, ACE-X-NME, is read from antechamber's .ac file as a graph of bonds, an
 
 Those atoms get the parent's names and ff19SB types from amino19.lib (CA becomes XC, which ties the residue to
 its CMAP). Backbone atoms and caps get ff19SB charges; the leftover is spread over the rest of the residue so it
-sums to the residue's net charge. Everything further out keeps antechamber's names, GAFF2 types and AM1-BCC charges.
+sums to the residue's net charge. Everything further out keeps antechamber's names, GAFF2 types and the charges
+step 5 computed (charge_method).
 """
 import json
 import os
